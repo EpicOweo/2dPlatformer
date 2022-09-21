@@ -11,7 +11,9 @@ public class Map {
 	private String path;
 	
 	public static int EMPTY = 0;
-	public static int TILE = 1;
+	public static int STONE = 1;
+	public static int GRASS = 2;
+	public static int DIRT = 3;
 	
 	public Map(String path, int width, int height) {
 		this.height = height;

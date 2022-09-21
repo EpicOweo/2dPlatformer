@@ -12,10 +12,18 @@ white = pygame.Color(255,255,255)
 black = pygame.Color(0,0,0)
 red = pygame.Color(255, 0, 0)
 gray = pygame.Color(128, 128, 128)
+brown = pygame.Color(165, 42, 42)
+green = pygame.Color(0, 255, 0)
+
 
 font = pygame.font.Font(None, 50)
 
 grid_width = 50
+
+
+current_block = 1
+max_block = 5
+
 
 grid = []
 for i in range(grid_width):
@@ -38,6 +46,7 @@ class Square:
     def __init__(self, rect, position):
         self.rect = rect
         self.x, self.y = position
+        self.block = 0
         self.pressed = False
 
     def check(self):
@@ -67,12 +76,15 @@ def save_grid():
     for i in grid_rects:
         line = ''
         for j in i:
-            if j.pressed:
-                line += '1'
-            else:
-                line += '0'
+            line += str(j.block)
         f.write(line + '\n')
     f.close()
+
+def change_current_block():
+    global current_block
+    current_block += 1
+    if current_block > max_block:
+        current_block = 1
 
 # main loop
 while True:
@@ -84,6 +96,10 @@ while True:
                 for j in i:
                     if j.check() and j not in last_squares:
                         j.pressed = not j.pressed
+                        if j.pressed:
+                            j.block = current_block
+                        else:
+                            j.block = 0
                         last_squares.append(j)
                         last_pressed = j.pressed
                         last_orientation = 0
@@ -91,6 +107,8 @@ while True:
             keyspressed = pygame.key.get_pressed()
             if keyspressed[pygame.K_s]:
                 save_grid()
+            if keyspressed[pygame.K_UP]:
+                change_current_block()
 
 
     if pygame.mouse.get_pressed()[0] == False:
@@ -101,7 +119,7 @@ while True:
 
     pygame.event.get()
 
-    screen.fill(gray)
+    screen.fill(black)
 
     pygame.draw.rect(screen, gray, grid_lines)
 
@@ -125,9 +143,14 @@ while True:
 
             color = white
 
-            if j.pressed: color = black
+            if j.pressed:
+                if j.block == 0: j.block = current_block
+                if j.block == 1: color = gray
+                elif j.block == 2: color = green
+                elif j.block == 3: color = brown
+                elif j.block == 4 or j.block == 5: j.block = 0
 
             pygame.draw.rect(screen, color, current)
-            screen.blit(font.render('test', True, black), (500, 500))
+            screen.blit(font.render('current block: ' + str(current_block), True, white), (10, 10))
 
     pygame.display.flip()

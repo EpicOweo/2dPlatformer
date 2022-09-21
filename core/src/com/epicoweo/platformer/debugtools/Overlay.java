@@ -1,4 +1,4 @@
-package com.epicoweo.platformer.overlays;
+package com.epicoweo.platformer.debugtools;
 
 public abstract class Overlay {
 

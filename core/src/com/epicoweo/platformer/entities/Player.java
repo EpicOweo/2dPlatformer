@@ -4,6 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Vector2;
 import com.epicoweo.platformer.items.weapons.AssaultRifle;
+import com.epicoweo.platformer.items.weapons.Pistol;
 import com.epicoweo.platformer.items.weapons.Weapon;
 import com.epicoweo.platformer.maps.Map;
 
@@ -15,9 +16,9 @@ public class Player extends Entity {
 	
 	public Player(float x, float y, int width, int height, Map map) {
 		super(x, y, width, height, map, true);
-		this.movementSpeed = 500;
-		this.maxVelocity = new Vector2(500, 500);
-		equipWeapon(new AssaultRifle(this));
+		this.movementSpeed = 250;
+		this.maxVelocity = new Vector2(250, 500);
+		equipWeapon(new Pistol(this));
 	}
 	
 	public void processInput() {
@@ -29,7 +30,7 @@ public class Player extends Entity {
 		} else {
 			acceleration.x = 0;
 		}
-		if (Gdx.input.isKeyJustPressed(Input.Keys.W)) {
+		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
 			if(grounded && !jumped) {
 				velocity.y += jumpVelocity;
 				jumped = true;

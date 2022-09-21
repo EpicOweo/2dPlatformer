@@ -1,4 +1,4 @@
-package com.epicoweo.platformer.overlays;
+package com.epicoweo.platformer.debugtools;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;

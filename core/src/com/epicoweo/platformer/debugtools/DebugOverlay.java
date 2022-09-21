@@ -1,4 +1,4 @@
-package com.epicoweo.platformer.overlays;
+package com.epicoweo.platformer.debugtools;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -13,7 +13,7 @@ public class DebugOverlay extends Overlay {
 	boolean showVectors;
 	
 	public DebugOverlay(SpriteBatch batch, BitmapFont font, float delta, boolean showVectors) {
-		this.batch = batch;
+		this.batch = new SpriteBatch();
 		this.font = font;
 		this.fps = 1/delta;
 		this.showVectors = showVectors;
@@ -33,5 +33,6 @@ public class DebugOverlay extends Overlay {
 		//right side
 		font.draw(batch, "Press V to show vectors.", (float)(0.85*Refs.APP_LENGTH), (float)(0.95*Refs.APP_WIDTH));
 		batch.end();
+		batch.dispose();
 	}
 }

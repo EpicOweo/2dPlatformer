@@ -34,6 +34,7 @@ public class Gun extends Weapon{
 		
 		
 		projectile = spawnProjectile(player_coords, (float)theta, bulletVelocity);
+		projectile.firedBy = player;
 		
 		currentProjectiles.add(projectile);
 		

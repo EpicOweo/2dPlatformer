@@ -5,18 +5,22 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.epicoweo.platformer.PlatformerGame;
+import com.epicoweo.platformer.debugtools.DebugOverlay;
+import com.epicoweo.platformer.entities.Enemy;
+import com.epicoweo.platformer.entities.FlailEnemy;
 import com.epicoweo.platformer.entities.Player;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
 import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.maps.Level1;
 import com.epicoweo.platformer.maps.Map;
-import com.epicoweo.platformer.overlays.DebugOverlay;
 
 public class GameScreen implements Screen {
 	
@@ -25,7 +29,9 @@ public class GameScreen implements Screen {
 	Array<Rectangle> rects;
 	Array<Rectangle> mapRects;
 	Array<Projectile> projectiles;
-	Player player;
+	Array<Enemy> enemies;
+	Array<Texture> textures;
+	static Player player;
 	Map map;
 	boolean showVectors = false;
 	
@@ -33,34 +39,52 @@ public class GameScreen implements Screen {
 		this.game = game;
 		this.rects = new Array<Rectangle>();
 		this.mapRects = new Array<Rectangle>();
+		this.enemies = new Array<Enemy>();
+		this.textures = new Array<Texture>();
 		
 		camera = new OrthographicCamera();
-		camera.setToOrtho(false, Refs.APP_LENGTH, Refs.APP_WIDTH);
+		//camera.setToOrtho(false, Refs.APP_LENGTH, Refs.APP_WIDTH);
+		camera.setToOrtho(false, Refs.APP_LENGTH / 2, Refs.APP_WIDTH / 2);
 		camera.position.set(camera.viewportWidth / 2f, camera.viewportHeight / 2f, 0);
 		camera.update();
+		Refs.camera = camera;
 		
+		loadTextures();
 		loadMap(new Level1());
-		createPlayer(Refs.APP_LENGTH / 2 - 32, Refs.APP_WIDTH / 2 - 64, 32, 64, map);
+		createPlayer(Refs.APP_LENGTH / 2 - Refs.TEXTURE_SIZE, 2 * Refs.APP_WIDTH / 3, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE * 2, map);
+		enemies.add(new FlailEnemy(new Vector2(Refs.TEXTURE_SIZE / 2, Refs.TEXTURE_SIZE * 21 / 2), Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, map));
+	}
+	
+	void loadTextures() {
+		this.textures.add(new Texture("../assets/textures/tiles/stone.png"));
+		this.textures.add(new Texture("../assets/textures/tiles/grass.png"));
+		this.textures.add(new Texture("../assets/textures/tiles/dirt.png"));
+		this.textures.add(new Texture("../assets/textures/tiles/brick_full_1.png"));
+		this.textures.add(new Texture("../assets/textures/tiles/brick_half_1.png"));
+		this.textures.add(new Texture("../assets/textures/tiles/brick_bg_1.png"));
 	}
 	
 	void loadMap(Map map) {
 		this.map = map;
-		game.renderer.begin(ShapeType.Filled);
+		game.batch.setProjectionMatrix(camera.combined);
+		game.batch.begin();
 		for(int i = 0; i < map.height; i++) {
 			for(int j = 0; j < map.width; j++) {
-				if (map.mapLayout[i][j] == 1) {
+				if (map.mapLayout[i][j] >= 1) {
 					mapRects.add(new Rectangle(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
-					game.renderer.rect(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+					//game.renderer.rect(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+					game.batch.draw(textures.get(map.mapLayout[i][j]-1), j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE);
+					
 				}
 			}
 		}
-		game.renderer.end();
+		game.batch.end();
 	}
 	
 	void moveCamera() {
 		float newCameraX = player.getRect().x + player.getRect().width / 2;
 		float newCameraY = camera.position.y;
-		float playerCenterY = (float)(player.getRect().y + 0.5 * player.getRect().height) + 75;
+		float playerCenterY = (float)(player.getRect().y + 0.5 * player.getRect().height) + 33;
 		
 		// if player is in the upper half of the screen
 		if (newCameraY < playerCenterY) {
@@ -72,7 +96,7 @@ public class GameScreen implements Screen {
 		camera.position.lerp(new Vector3(newCameraX, newCameraY, 0), 0.1f);
 	}
 	
-	public void createPlayer(float x, float y, int width, int height, Map map) {
+	public static void createPlayer(float x, float y, int width, int height, Map map) {
 		player = new Player(x, y, width, height, map);
 	}
 	
@@ -87,6 +111,15 @@ public class GameScreen implements Screen {
 		ScreenUtils.clear(0, 0, 0, 1);
 		camera.update();
 		
+		DebugOverlay debugOverlay = new DebugOverlay(game.batch, game.font, delta, showVectors);
+		loadMap(new Level1());
+		player.update(delta);
+		for(Enemy e : enemies) {
+			e.update(delta);
+		}
+		moveCamera();
+		debugOverlay.render();
+		
 		game.renderer.setProjectionMatrix(camera.combined);
 		game.renderer.begin(ShapeType.Filled);
 		game.renderer.setColor(Color.WHITE);
@@ -94,6 +127,9 @@ public class GameScreen implements Screen {
 			game.renderer.rect(rect.x, rect.y, rect.width, rect.height);
 		}
 		game.renderer.rect(player.getRect().x, player.getRect().y, player.getRect().width, player.getRect().height);
+		for(Enemy e : enemies) {
+			game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
+		}
 		if(player.weapon.currentProjectiles.notEmpty()) {
 			for(Projectile proj : player.weapon.currentProjectiles) {
 				if(proj.remove) {
@@ -103,10 +139,16 @@ public class GameScreen implements Screen {
 				game.renderer.rect(proj.getRect().x, proj.getRect().y, proj.getRect().width, proj.getRect().height);
 			}
 		}
+		
+		for(Enemy e : enemies) {
+			if(e.remove) {
+				enemies.removeValue(e, false);
+			}
+		}
 		game.renderer.end(); //rects etc
 		
 		projectiles = player.weapon.currentProjectiles;
-		Refs.updateEntities(player, projectiles);
+		Refs.updateEntities(player, projectiles, enemies);
 		Refs.updateUtils(game, game.batch, game.renderer, camera);
 		
 		//game.batch.setProjectionMatrix(camera.combined);
@@ -118,12 +160,6 @@ public class GameScreen implements Screen {
 		if(Gdx.input.isKeyJustPressed(Input.Keys.V)) {
 			showVectors = !showVectors;
 		}
-		
-		DebugOverlay debugOverlay = new DebugOverlay(game.batch, game.font, delta, showVectors);
-		debugOverlay.render();
-		loadMap(new Level1());
-		player.update(delta);
-		moveCamera();
 
 	}
 
@@ -153,7 +189,9 @@ public class GameScreen implements Screen {
 
 	@Override
 	public void dispose() {
-		
+		for(Texture t : textures) {
+			t.dispose();
+		}
 
 	}
 
