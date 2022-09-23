@@ -65,7 +65,7 @@ public class Entity {
 	}
 	
 	private void spawn() {
-		GameScreen.createPlayer(100f, 100f, (int)rect.width, (int)rect.height, map);
+		GameScreen.createPlayer(map.playerSpawn.x, map.playerSpawn.y, (int)rect.width, (int)rect.height, map);
 	}
 
 	public void accelerate(float delta) {
@@ -171,7 +171,7 @@ public class Entity {
 	}
 	
 	public void fetchCollidableRects() {
-		int[][] tiles = map.mapLayout;
+		Array<Array<Integer>> tiles = map.mapLayout;
 		//bottom left
 		int p1x = (int)(rect.x / Refs.TEXTURE_SIZE);
 		int p1y = (int)Math.floor(rect.y / Refs.TEXTURE_SIZE);
@@ -194,10 +194,10 @@ public class Entity {
 		
 		try {
 			//grabbing the tiles that correspond to the positions of the points
-			int tile1 = tiles[map.mapLayout[0].length - 1 - p1y][p1x];
-			int tile2 = tiles[map.mapLayout[0].length - 1 - p2y][p2x];
-			int tile3 = tiles[map.mapLayout[0].length - 1 - p3y][p3x];
-			int tile4 = tiles[map.mapLayout[0].length - 1 - p4y][p4x];
+			int tile1 = tiles.get(map.mapLayout.get(0).size - 1 - p1y).get(p1x);
+			int tile2 = tiles.get(map.mapLayout.get(0).size - 1 - p2y).get(p2x);
+			int tile3 = tiles.get(map.mapLayout.get(0).size - 1 - p3y).get(p3x);
+			int tile4 = tiles.get(map.mapLayout.get(0).size - 1 - p4y).get(p4x);
 			
 			if(tile1 >= 1) {
 				cRects[0].set(p1x*Refs.TEXTURE_SIZE, p1y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);

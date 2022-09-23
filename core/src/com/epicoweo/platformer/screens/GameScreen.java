@@ -50,9 +50,10 @@ public class GameScreen implements Screen {
 		Refs.camera = camera;
 		
 		loadTextures();
-		loadMap(new Level1());
-		createPlayer(Refs.APP_LENGTH / 2 - Refs.TEXTURE_SIZE, 2 * Refs.APP_WIDTH / 3, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE * 2, map);
-		enemies.add(new FlailEnemy(new Vector2(Refs.TEXTURE_SIZE / 2, Refs.TEXTURE_SIZE * 21 / 2), Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, map));
+		this.map = new Level1();
+		loadMap();
+		createPlayer(map.playerSpawn.x, map.playerSpawn.y, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE * 2, map);
+		loadEntities();
 	}
 	
 	void loadTextures() {
@@ -64,21 +65,31 @@ public class GameScreen implements Screen {
 		this.textures.add(new Texture("../assets/textures/tiles/brick_bg_1.png"));
 	}
 	
-	void loadMap(Map map) {
-		this.map = map;
+	void loadEntities() {
+		for(int i = 0; i < map.width; i++) {
+			for(int j = 0; j < map.height; j++) {
+				if (map.mapEntities.get(i).get(j) == 1) {
+					enemies.add(new FlailEnemy(new Vector2(Refs.TEXTURE_SIZE * (j+0.5f),Refs.TEXTURE_SIZE *(map.mapEntities.size - i+0.5f)), Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, map));
+				}
+			}
+		}
+		
+	}
+	
+	void loadMap() {
 		game.batch.setProjectionMatrix(camera.combined);
 		game.batch.begin();
-		for(int i = 0; i < map.height; i++) {
-			for(int j = 0; j < map.width; j++) {
-				if (map.mapLayout[i][j] >= 1) {
+		for(int i = 0; i < map.width; i++) {
+			for(int j = 0; j < map.height; j++) {
+				if (map.mapLayout.get(i).get(j) >= 1) {
 					mapRects.add(new Rectangle(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
-					//game.renderer.rect(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
-					game.batch.draw(textures.get(map.mapLayout[i][j]-1), j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE);
+					game.batch.draw(textures.get(map.mapLayout.get(i).get(j)-1), j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE);
 					
 				}
 			}
 		}
 		game.batch.end();
+		
 	}
 	
 	void moveCamera() {
@@ -112,7 +123,7 @@ public class GameScreen implements Screen {
 		camera.update();
 		
 		DebugOverlay debugOverlay = new DebugOverlay(game.batch, game.font, delta, showVectors);
-		loadMap(new Level1());
+		loadMap();
 		player.update(delta);
 		for(Enemy e : enemies) {
 			e.update(delta);
