@@ -15,6 +15,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.epicoweo.platformer.PlatformerGame;
 import com.epicoweo.platformer.debugtools.DebugOverlay;
 import com.epicoweo.platformer.entities.Enemy;
+import com.epicoweo.platformer.entities.Entity;
 import com.epicoweo.platformer.entities.FlailEnemy;
 import com.epicoweo.platformer.entities.Player;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
@@ -31,7 +32,7 @@ public class GameScreen implements Screen {
 	Array<Projectile> projectiles;
 	Array<Enemy> enemies;
 	Array<Texture> textures;
-	static Player player;
+	public static Player player;
 	Map map;
 	boolean showVectors = false;
 	
@@ -41,6 +42,7 @@ public class GameScreen implements Screen {
 		this.mapRects = new Array<Rectangle>();
 		this.enemies = new Array<Enemy>();
 		this.textures = new Array<Texture>();
+		this.projectiles = new Array<Projectile>();
 		
 		camera = new OrthographicCamera();
 		//camera.setToOrtho(false, Refs.APP_LENGTH, Refs.APP_WIDTH);
@@ -54,6 +56,7 @@ public class GameScreen implements Screen {
 		loadMap();
 		createPlayer(map.playerSpawn.x, map.playerSpawn.y, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE * 2, map);
 		loadEntities();
+		Refs.updateEntities(player, projectiles, enemies);
 	}
 	
 	void loadTextures() {
@@ -137,10 +140,22 @@ public class GameScreen implements Screen {
 		for(Rectangle rect : rects) {
 			game.renderer.rect(rect.x, rect.y, rect.width, rect.height);
 		}
-		game.renderer.rect(player.getRect().x, player.getRect().y, player.getRect().width, player.getRect().height);
-		for(Enemy e : enemies) {
-			game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
+		
+		for(Entity e : Refs.entities) {
+			if(e instanceof Projectile) {
+				continue;
+			} else if(e.getCircle() != null) {
+				game.renderer.circle(e.getCircle().x, e.getCircle().y, e.getCircle().radius);
+			} else {
+				game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
+			}
 		}
+		
+		//game.renderer.rect(player.getRect().x, player.getRect().y, player.getRect().width, player.getRect().height);
+		//for(Enemy e : enemies) {
+		//	
+		//	game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
+		//}
 		if(player.weapon.currentProjectiles.notEmpty()) {
 			for(Projectile proj : player.weapon.currentProjectiles) {
 				if(proj.remove) {

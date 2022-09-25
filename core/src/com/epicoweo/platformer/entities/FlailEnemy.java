@@ -2,6 +2,7 @@ package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.epicoweo.platformer.etc.Refs;
@@ -11,9 +12,9 @@ public class FlailEnemy extends Enemy {
 
 	Vector2 centerpos;
 	
-	double angle; // radians
 	double angularVelocity;
 	int radius;
+	
 	
 	public FlailEnemy(Vector2 centerpos, int width, int height, Map map) {
 		super(centerpos.x + 30, centerpos.y, width, height, map, false);
@@ -23,6 +24,7 @@ public class FlailEnemy extends Enemy {
 		this.angle = 0;
 		this.angularVelocity = 2.5;
 		this.radius = 75;
+		this.circle = new Circle(centerpos.x, centerpos.y, rect.width / 2);
 	}
 	
 	@Override
@@ -49,7 +51,10 @@ public class FlailEnemy extends Enemy {
 	
 	@Override
 	public void move(float delta) {
-		rect.setCenter((float)(radius * Math.cos(angle) + centerpos.x), (float)(radius * Math.sin(angle) + centerpos.y));
+		Vector2 newPos = new Vector2((float)(radius * Math.cos(angle) + centerpos.x), (float)(radius * Math.sin(angle) + centerpos.y));
+		rect.setCenter(newPos);
+		circle.setPosition(newPos);
+		this.updatePoly();
 	}
 	
 	public void rotate(float delta) {

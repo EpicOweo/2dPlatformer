@@ -2,6 +2,9 @@ package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.math.Circle;
+import com.badlogic.gdx.math.Intersector;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
@@ -13,6 +16,7 @@ import com.epicoweo.platformer.screens.GameScreen;
 public class Entity {
 
 	protected Rectangle rect;
+	protected Polygon poly;
 	public Vector2 velocity;
 	public Vector2 maxVelocity;
 	public Vector2 acceleration;
@@ -23,6 +27,8 @@ public class Entity {
 	public boolean remove = false;
 	protected boolean breakOnCollide = false;
 	public boolean dead = false;
+	double angle; // radians
+	Circle circle = null;
 	
 	public int friction = 200;
 	
@@ -32,40 +38,53 @@ public class Entity {
 		this.acceleration = new Vector2(0, 0);
 		this.map = map;
 		this.affectedByGravity = affectedByGravity;
+		this.angle = 0;
+		
+		this.poly = new Polygon(new float[] {
+			rect.x, rect.y,
+			rect.x, rect.y + rect.height,
+			rect.x + rect.width, rect.y + rect.height,
+			rect.x + rect.width, rect.y
+		});	
+	}
+	
+	protected void updatePoly() {
+		this.poly = new Polygon(new float[] {
+			rect.x, rect.y,
+			rect.x, rect.y + rect.height,
+			rect.x + rect.width, rect.y + rect.height,
+			rect.x + rect.width, rect.y
+		});	
+		this.poly.setRotation((float)Math.toDegrees(angle));
+	}
+	
+	public Circle getCircle() {
+		return this.circle;
 	}
 	
 	public Rectangle getRect() {
 		return this.rect;
 	}
 	
+	public Polygon getPoly() {
+		return this.poly;
+	}
+	
 	public void update(float delta) {
-		if(this instanceof Player) {
-			if(dead) {
-				spawn();
-			}
-			((Player)this).processInput();
-			if(((Player)this).jumped && velocity.y > 0) {
-				grounded = false;
-			}
-			if(grounded) {
-				((Player)this).jumped = false;
-			}
-		} else {
-			if(dead) {
-				this.remove = true;
-			}
+		if(dead) {
+			this.remove = true;
 		}
 		if(!grounded && affectedByGravity) {
 			acceleration.y = Refs.GRAVITY;
 		}
 		
+		if(Math.abs(velocity.x) < 1) {
+			velocity.x = 0;
+		}
 		accelerate(delta);
 		move(delta);
+		updatePoly();
 		
-	}
-	
-	private void spawn() {
-		GameScreen.createPlayer(map.playerSpawn.x, map.playerSpawn.y, (int)rect.width, (int)rect.height, map);
 	}
 
 	public void accelerate(float delta) {
@@ -106,6 +125,15 @@ public class Entity {
 	Rectangle[] cRects = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
 	Array<Entity> collidableEntities = new Array<Entity>();
 	
+	private void polyCollideRect(Polygon p, Rectangle r) {
+		this.poly = new Polygon(new float[] {
+			rect.x, rect.y,
+			rect.x, rect.y + rect.height,
+			rect.x + rect.width, rect.y + rect.height,
+			rect.x + rect.width, rect.y
+		});	
+	}
+	
 	public void move(float delta) {
 		rect.x += velocity.x * delta;
 		fetchCollidableRects();
@@ -138,19 +166,34 @@ public class Entity {
 		}
 		
 		for(int i = 0; i < collidableEntities.size; i++) {
-			if(rect.overlaps(collidableEntities.get(i).getRect())) {
-				if(this instanceof Projectile && breakOnCollide && !(((Projectile)this).firedBy instanceof Player)) {
-					remove = true;
-				}
-				if(this instanceof Enemy && collidableEntities.get(i) instanceof Projectile && !(((Projectile)collidableEntities.get(i)).firedBy instanceof Enemy)) {
-					dead = true;
-					collidableEntities.get(i).remove = true;
-				}
-				if(this instanceof Player && collidableEntities.get(i) instanceof Enemy) {
-					if(!collidableEntities.get(i).dead) {
-						dead = true;
-					}
-				}
+			doEntityCollisions(collidableEntities.get(i));
+		}
+	}
+	
+	private void doEntityCollisions(Entity e) {
+		boolean overlap = false;
+		
+		if(e.circle != null) {
+			if(Intersector.overlaps(e.circle, this.rect)) {
+				overlap = true;
+			}
+		} else {
+			if(this.rect.overlaps(e.rect)) {
+				overlap = true;
+			}
+		}
+		if(!overlap) return;
+		
+		if(this instanceof Projectile && breakOnCollide && !(((Projectile)this).firedBy instanceof Player)) {
+			remove = true;
+		}
+		if(this instanceof Enemy && e instanceof Projectile && !(((Projectile)e).firedBy instanceof Enemy)) {
+			dead = true;
+			e.remove = true;
+		}
+		if(this instanceof Player && e instanceof Enemy) {
+			if(!e.dead) {
+				dead = true;
 			}
 		}
 	}
@@ -158,6 +201,7 @@ public class Entity {
 	public void moveTo(double x, double y) {
 		rect.x = (float)x;
 		rect.y = (float)y;
+		updatePoly();
 	}
 	
 	public void doFriction(float delta) {
