@@ -2,6 +2,7 @@ package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.epicoweo.platformer.etc.Refs;
@@ -14,11 +15,12 @@ public class Player extends Entity {
 
 	int jumpVelocity = 490;
 	int dashVelocityX = 300;
-	int dashVelocityY = 490;
+	int dashVelocityY = 400;
 	boolean jumped = false;
 	boolean dashed = false;
 	public Weapon weapon;
 	long lastDash = 0;
+	int framesOnWall = 0; //number of frames the player has been on the wall
 	
 	public Player(float x, float y, int width, int height, Map map) {
 		super(x, y, width, height, map, true);
@@ -43,18 +45,49 @@ public class Player extends Entity {
 			grounded = false;
 		}
 		
+		if(velocity.y > 490) {
+			velocity.y = 490;
+		}
+		
+		checkDash();
+		
+		this.wallJumped = false;
+		
+		checkWallFrames();
+		processInput();
+		
+		this.onWall = false;
+		
+		accelerate(delta);
+		move(delta);
+		if(this.onWall) {
+			framesOnWall += 1;
+		} else {
+			framesOnWall = 0;
+		}
 		if(!grounded && affectedByGravity) {
-			acceleration.y = Refs.GRAVITY;
+			if(onWall && velocity.y < 0) {
+				acceleration.y = 0;
+				if(Gdx.input.isKeyPressed(Keys.S)) {
+					velocity.y = -250;
+				} else {
+					velocity.y = -100;
+				}
+			} else {
+				acceleration.y = Refs.GRAVITY;
+			}
 		}
 		
 		if(Math.abs(velocity.x) < 1) {
 			velocity.x = 0;
 		}
-		
-		checkDash();
-		processInput();
-		accelerate(delta);
-		move(delta);
+	}
+	
+	public void checkWallFrames() {
+		if(framesOnWall > 5 && !dashed) {
+			System.out.println(framesOnWall);
+			dashed = true;
+		}
 	}
 	
 	@Override
@@ -79,8 +112,23 @@ public class Player extends Entity {
 			affectedByGravity = true;
 		}
 		
-		if(TimeUtils.nanoTime() - lastDash > 500000000) {
+		if((TimeUtils.nanoTime() - lastDash > 100000000) || !Gdx.input.isKeyPressed(Keys.SPACE)) {
 			affectedByGravity = true;
+		}
+	}
+	
+	public void jump() {
+		onWall = false;
+		velocity.y += jumpVelocity;
+	}
+	
+	public void wallJump() {
+		onWall = false;
+		velocity.y += jumpVelocity;
+		if(lastSideCollided == 0) { //if going left, jump right
+			velocity.x += 200;
+		} else {
+			velocity.x -= 200;
 		}
 	}
 	
@@ -95,9 +143,17 @@ public class Player extends Entity {
 		}
 		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
 			if(grounded && !jumped) {
-				velocity.y += jumpVelocity;
+				jump();
 				jumped = true;
-			} else if (!dashed) {
+			} else if(onWall && !wallJumped) {
+				wallJump();
+				wallJumped = true;
+				dashed = false;
+			} else if(wallJumped && !jumped) { // allow the player a jump after the one off the wall
+				jump();
+				wallJumped = false;
+				jumped = true;
+			} else if(!dashed) { // allow a dash
 				dash();
 				dashed = true;
 			}
@@ -149,6 +205,7 @@ public class Player extends Entity {
 		}
 		
 		affectedByGravity = false;
+		this.acceleration = new Vector2();
 		this.velocity = new Vector2((float)(dashVelocityX * Math.cos(dashAngle)), (float)(dashVelocityY * Math.sin(dashAngle)));
 		lastDash = TimeUtils.nanoTime();
 	}

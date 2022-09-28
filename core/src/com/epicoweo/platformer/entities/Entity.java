@@ -29,8 +29,11 @@ public class Entity {
 	public boolean dead = false;
 	double angle; // radians
 	Circle circle = null;
+	boolean onWall = false;
+	boolean wallJumped = false;
+	int lastSideCollided; //0 left, 1 right
 	
-	public int friction = 200;
+	public int friction = 500;
 	
 	public Entity(float x, float y, int width, int height, Map map, boolean affectedByGravity) {
 		this.rect = new Rectangle(x, y, width, height);
@@ -74,15 +77,16 @@ public class Entity {
 		if(dead) {
 			this.remove = true;
 		}
-		if(!grounded && affectedByGravity) {
-			acceleration.y = Refs.GRAVITY;
-		}
 		
 		if(Math.abs(velocity.x) < 1) {
 			velocity.x = 0;
 		}
-		accelerate(delta);
+		
+		if(!grounded && affectedByGravity) {
+			acceleration.y = Refs.GRAVITY;
+		}
 		move(delta);
+		accelerate(delta);
 		updatePoly();
 		
 	}
@@ -98,14 +102,17 @@ public class Entity {
 	
 	private void collideX(Rectangle r) {
 		if(velocity.x < 0) {
+			lastSideCollided = 0;
 			rect.x = r.x + r.width + 0.01f;
 		} else {
+			lastSideCollided = 1;
 			rect.x = r.x - rect.width - 0.01f;
 		}
 		if(!(this instanceof Player)) {
 			velocity.x = -velocity.x;
 		} else {
 			velocity.x = 0;
+			this.onWall = true;
 		}
 	}
 	
@@ -140,7 +147,7 @@ public class Entity {
 		for(int i = 0; i < cRects.length; i++) {
 			if(rect.overlaps(cRects[i])) {
 				collideX(cRects[i]);
-					
+				
 				if(breakOnCollide) {
 					remove = true;
 				}
