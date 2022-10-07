@@ -3,11 +3,14 @@ package com.epicoweo.platformer.entities;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Input.Keys;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.items.weapons.Pistol;
 import com.epicoweo.platformer.items.weapons.Weapon;
+import com.epicoweo.platformer.maps.JsonMap;
 import com.epicoweo.platformer.maps.Map;
 import com.epicoweo.platformer.screens.GameScreen;
 
@@ -16,21 +19,50 @@ public class Player extends Entity {
 	int jumpVelocity = 490;
 	int dashVelocityX = 300;
 	int dashVelocityY = 400;
+	int aerialXAcceleration = 500;
 	boolean jumped = false;
 	boolean dashed = false;
 	public Weapon weapon;
 	long lastDash = 0;
 	int framesOnWall = 0; //number of frames the player has been on the wall
+	public Texture texture;
+	String direction = "left";
 	
-	public Player(float x, float y, int width, int height, Map map) {
+	public boolean flyMode = false;
+	
+	int wallJumpBuffer = 250000000;
+	
+	public Player(float x, float y, int width, int height, JsonMap map) {
 		super(x, y, width, height, map, true);
 		this.movementSpeed = 250;
 		this.maxVelocity = new Vector2(250, 500);
 		equipWeapon(new Pistol(this));
+		createTexture();
+		
+
+	}
+	
+	void createTexture() {
+		Pixmap pixmap16 = new Pixmap(Gdx.files.internal("../assets/textures/player/player_" + direction + ".png"));
+		Pixmap pixmap32 = new Pixmap(20, 32, pixmap16.getFormat());
+		pixmap32.setFilter(Pixmap.Filter.NearestNeighbour);
+		pixmap32.drawPixmap(pixmap16,
+		        0, 0, pixmap16.getWidth(), pixmap16.getHeight(),
+		        0, 0, pixmap32.getWidth(), pixmap32.getHeight()
+		);
+		texture = new Texture(pixmap32);
+		
+		pixmap16.dispose();
+		pixmap32.dispose();
 	}
 	
 	@Override
 	public void update(float delta) {
+		if(flyMode) {
+			updateWithFlyMode(delta);
+			return;
+		}
+		
 		if(dead) {
 			spawn();
 		}
@@ -49,9 +81,13 @@ public class Player extends Entity {
 			velocity.y = 490;
 		}
 		
-		checkDash();
+		if(Math.abs(velocity.x) < 10f) {
+			if(!(Gdx.input.isKeyPressed(Keys.A)) && !(Gdx.input.isKeyPressed(Keys.D))) {
+				velocity.x = 0;
+			}
+		}
 		
-		this.wallJumped = false;
+		checkDash();
 		
 		checkWallFrames();
 		processInput();
@@ -77,10 +113,18 @@ public class Player extends Entity {
 				acceleration.y = Refs.GRAVITY;
 			}
 		}
+	}
+	
+	public void updateWithFlyMode(float delta) {
 		
-		if(Math.abs(velocity.x) < 1) {
-			velocity.x = 0;
+		if(Math.abs(velocity.x) < 10f) {
+			if(!(Gdx.input.isKeyPressed(Keys.A)) && !(Gdx.input.isKeyPressed(Keys.D))) {
+				velocity.x = 0;
+			}
 		}
+		
+		processInputFlyMode();
+		move(delta);
 	}
 	
 	public void checkWallFrames() {
@@ -94,12 +138,18 @@ public class Player extends Entity {
 	public void accelerate(float delta) {
 		if(Math.abs(velocity.x) < maxVelocity.x) {
 			velocity.x += acceleration.x * delta;
+		} else {
+			velocity.x = Math.signum(velocity.x) * maxVelocity.x;
 		}
 		if(Math.abs(velocity.y) < maxVelocity.y) {
 			velocity.y += acceleration.y * delta;
 		} else if(Math.abs(velocity.y) > maxVelocity.y && dashed) {
 			velocity.y += acceleration.y * delta;
 		}
+	}
+	
+	protected void respawn() {
+		this.dead = true;
 	}
 	
 	protected void spawn() {
@@ -132,12 +182,75 @@ public class Player extends Entity {
 		}
 	}
 	
+	public void setFlyMode(boolean on) {
+		if(on) {
+			flyMode = true;
+		} else {
+			flyMode = false;
+		}
+	}
+	
+	public void toggleFlyMode() {
+		flyMode = !flyMode;
+	}
+	
+	public void processInputFlyMode() {
+		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
+			velocity.x = -1 * movementSpeed;
+			if(direction == "right") {
+				direction = "left";
+				createTexture();
+			}
+		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
+			velocity.x = 1 * movementSpeed;
+			if(direction == "left") {
+				direction = "right";
+				createTexture();
+			}
+			
+		} else {
+			velocity.x = 0;
+		}
+		
+		if (Gdx.input.isKeyPressed(Input.Keys.W)) {
+			velocity.y = 1 * movementSpeed;
+		} else if(Gdx.input.isKeyPressed(Keys.S)) {
+			velocity.y = -1 * movementSpeed;
+		} else {
+			velocity.y = 0;
+		}
+	}
+	
 	public void processInput() {
+		
+		if(Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+			toggleFlyMode();
+			return;
+		}
+		
+		if(flyMode) {
+			processInputFlyMode();
+		}
+		
 		//movement
 		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
 			acceleration.x = -1 * movementSpeed;
+			if(!grounded && velocity.x > 0){ // to allow better aerial control
+				acceleration.x = (100 * Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
+			}
+			if(direction == "right") {
+				direction = "left";
+				createTexture();
+			}
 		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
 			acceleration.x = 1 * movementSpeed;
+			if(!grounded && velocity.x < 0){
+				acceleration.x = (100 * Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
+			}
+			if(direction == "left") {
+				direction = "right";
+				createTexture();
+			}
 		} else {
 			acceleration.x = 0;
 		}
@@ -145,7 +258,7 @@ public class Player extends Entity {
 			if(grounded && !jumped) {
 				jump();
 				jumped = true;
-			} else if(onWall && !wallJumped) {
+			} else if((onWall || TimeUtils.nanoTime() <= lastOnWall + wallJumpBuffer) && !wallJumped) {
 				wallJump();
 				wallJumped = true;
 				dashed = false;
@@ -158,6 +271,11 @@ public class Player extends Entity {
 				dashed = true;
 			}
 		}
+		
+		if(Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+			respawn();
+		}
+		
 		if(Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
 			weapon.use();
 		}

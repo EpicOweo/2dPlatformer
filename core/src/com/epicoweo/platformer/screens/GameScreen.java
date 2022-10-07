@@ -1,5 +1,7 @@
 package com.epicoweo.platformer.screens;
 
+import java.io.IOException;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
@@ -20,7 +22,7 @@ import com.epicoweo.platformer.entities.FlailEnemy;
 import com.epicoweo.platformer.entities.Player;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.Level1;
+import com.epicoweo.platformer.maps.JsonMap;
 import com.epicoweo.platformer.maps.Map;
 
 public class GameScreen implements Screen {
@@ -33,7 +35,7 @@ public class GameScreen implements Screen {
 	Array<Enemy> enemies;
 	Array<Texture> textures;
 	public static Player player;
-	Map map;
+	JsonMap map;
 	boolean showVectors = false;
 	
 	public GameScreen(final PlatformerGame game) {
@@ -52,10 +54,15 @@ public class GameScreen implements Screen {
 		Refs.camera = camera;
 		
 		loadTextures();
-		this.map = new Level1();
+		try {
+			this.map = new JsonMap("../assets/levels/level_skeleton.json");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		loadMap();
-		createPlayer(map.playerSpawn.x, map.playerSpawn.y, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE * 2, map);
-		loadEntities();
+		createPlayer(map.playerSpawn.x, map.playerSpawn.y, 20, 32, map);
+		//loadEntities();
 		Refs.updateEntities(player, projectiles, enemies);
 	}
 	
@@ -84,9 +91,9 @@ public class GameScreen implements Screen {
 		game.batch.begin();
 		for(int i = 0; i < map.width; i++) {
 			for(int j = 0; j < map.height; j++) {
-				if (map.mapLayout.get(i).get(j) >= 1) {
-					mapRects.add(new Rectangle(j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
-					game.batch.draw(textures.get(map.mapLayout.get(i).get(j)-1), j * Refs.TEXTURE_SIZE, (map.height - i - 1) * Refs.TEXTURE_SIZE);
+				if (map.mapLayout.get(j).get(i) >= 1) {
+					mapRects.add(new Rectangle((map.width - 1 - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
+					game.batch.draw(textures.get(map.mapLayout.get(j).get(i)-1), (map.width - 1 - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE);
 					
 				}
 			}
@@ -110,8 +117,8 @@ public class GameScreen implements Screen {
 		camera.position.lerp(new Vector3(newCameraX, newCameraY, 0), 0.1f);
 	}
 	
-	public static void createPlayer(float x, float y, int width, int height, Map map) {
-		player = new Player(x, y, width, height, map);
+	public static void createPlayer(float x, float y, int width, int height, JsonMap map2) {
+		player = new Player(x, y, width, height, map2);
 	}
 	
 	@Override
@@ -138,24 +145,22 @@ public class GameScreen implements Screen {
 		game.renderer.begin(ShapeType.Filled);
 		game.renderer.setColor(Color.WHITE);
 		for(Rectangle rect : rects) {
+			System.out.println(rect.x + " " + rect.y + " " + rect.width + " " + rect.height);
 			game.renderer.rect(rect.x, rect.y, rect.width, rect.height);
 		}
 		
 		for(Entity e : Refs.entities) {
 			if(e instanceof Projectile) {
 				continue;
-			} else if(e.getCircle() != null) {
+			} else if (e instanceof Player) {
+				continue;
+			} else if (e.getCircle() != null) {
 				game.renderer.circle(e.getCircle().x, e.getCircle().y, e.getCircle().radius);
 			} else {
 				game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
 			}
 		}
 		
-		//game.renderer.rect(player.getRect().x, player.getRect().y, player.getRect().width, player.getRect().height);
-		//for(Enemy e : enemies) {
-		//	
-		//	game.renderer.rect(e.getRect().x, e.getRect().y, e.getRect().width, e.getRect().height);
-		//}
 		if(player.weapon.currentProjectiles.notEmpty()) {
 			for(Projectile proj : player.weapon.currentProjectiles) {
 				if(proj.remove) {
@@ -172,6 +177,12 @@ public class GameScreen implements Screen {
 			}
 		}
 		game.renderer.end(); //rects etc
+		
+		game.batch.begin();
+		Rectangle playerRect = player.getRect();
+		game.batch.draw(player.texture, playerRect.x, playerRect.y);
+		game.batch.end();
+		
 		
 		projectiles = player.weapon.currentProjectiles;
 		Refs.updateEntities(player, projectiles, enemies);

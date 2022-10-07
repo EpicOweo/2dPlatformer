@@ -30,10 +30,14 @@ public class DebugOverlay extends Overlay {
 		//left side
 		font.draw(batch, "FPS: " + (int)fps, (float)(0.05*Refs.APP_LENGTH), (float)(0.95*Refs.APP_WIDTH));
 		font.draw(batch, "Mouse: (" + Gdx.input.getX() + ", " + Gdx.input.getY() + ")", (float)(0.05*Refs.APP_LENGTH), (float)(0.90*Refs.APP_WIDTH));
-		font.draw(batch, "Player Velocity: (" + GameScreen.player.velocity.x + ", " + GameScreen.player.velocity.y + ")", (float)(0.05*Refs.APP_LENGTH), (float)(0.85*Refs.APP_WIDTH));
+		font.draw(batch, "Player Position: (" + GameScreen.player.getRect().x + ", " + GameScreen.player.getRect().y + ")", (float)(0.05*Refs.APP_LENGTH), (float)(0.85*Refs.APP_WIDTH));
+		font.draw(batch, "Player Velocity: (" + GameScreen.player.velocity.x + ", " + GameScreen.player.velocity.y + ")", (float)(0.05*Refs.APP_LENGTH), (float)(0.80*Refs.APP_WIDTH));
+		font.draw(batch, "Player Acceleration: (" + GameScreen.player.acceleration.x + ", " + GameScreen.player.acceleration.y + ")", (float)(0.05*Refs.APP_LENGTH), (float)(0.75*Refs.APP_WIDTH));
 		
 		//right side
 		font.draw(batch, "Press V to show vectors.", (float)(0.85*Refs.APP_LENGTH), (float)(0.95*Refs.APP_WIDTH));
+		font.draw(batch, "Press R to respawn.", (float)(0.85*Refs.APP_LENGTH), (float)(0.90*Refs.APP_WIDTH));
+		font.draw(batch, "Press F to toggle fly mode.", (float)(0.85*Refs.APP_LENGTH), (float)(0.85*Refs.APP_WIDTH));
 		batch.end();
 		batch.dispose();
 	}
