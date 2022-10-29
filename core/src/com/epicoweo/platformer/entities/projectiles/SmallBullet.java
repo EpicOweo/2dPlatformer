@@ -1,7 +1,6 @@
 package com.epicoweo.platformer.entities.projectiles;
 
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
 
 public class SmallBullet extends Projectile {
 	

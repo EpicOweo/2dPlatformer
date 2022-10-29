@@ -10,10 +10,9 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
+import com.epicoweo.platformer.etc.PolyUtils;
 import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
-import com.epicoweo.platformer.screens.GameScreen;
 
 public class Entity {
 
@@ -36,6 +35,19 @@ public class Entity {
 	boolean wallJumped = false;
 	int lastSideCollided; //0 left, 1 right
 	boolean collidedNone; //if collided with no tiles
+	boolean collidedSlope;
+	protected long lastOnSlope = 0;
+	boolean goingUpSlope = false;
+	boolean lockToSlope = true;
+	
+	public Hitbox hitbox;
+	public Hitbox boxCastLeft;
+	public Hitbox boxCastRight;
+	public Hitbox boxCastBottom;
+	public Hitbox boxCastBottomLeft;
+	public Hitbox boxCastBottomRight;
+	
+	public Array<Hitbox> hitboxes;
 	
 	public int friction = 500;
 	
@@ -47,20 +59,43 @@ public class Entity {
 		this.affectedByGravity = affectedByGravity;
 		this.angle = 0;
 		
+		createHitboxes(width, height);
+		
 		this.poly = new Polygon(new float[] {
-			rect.x, rect.y,
-			rect.x, rect.y + rect.height,
-			rect.x + rect.width, rect.y + rect.height,
-			rect.x + rect.width, rect.y
+			rect.x, rect.y, // bottom left
+			rect.x, (rect.y + rect.height + rect.y) / 2, // middle left
+			rect.x, rect.y + rect.height, // top left
+			(rect.x + rect.width + rect.x) / 2, rect.y + rect.height, //top middle
+			rect.x + rect.width, rect.y + rect.height, // top right
+			rect.x + rect.width, (rect.y + rect.height + rect.y) / 2, //middle right
+			rect.x + rect.width, rect.y, // bottom right
+			(rect.x + rect.width + rect.x) / 2, rect.y //bottom middle
 		});	
 	}
 
+	private void createHitboxes(int width, int height) {
+		this.hitbox = new Hitbox(width-2, height-1, this);
+		this.boxCastBottom = new BoxCast(0, -5, width - 2, 10, this);
+		this.boxCastBottomLeft = new BoxCast(-5, -5, 10, 10, this);
+		this.boxCastBottomRight = new BoxCast(this.rect.width - 5, -5, 10, 10, this);
+		this.boxCastLeft = new BoxCast(-5, 5, 10, (int) this.rect.height, this);
+		this.boxCastRight = new BoxCast(this.rect.width-5, 5, 10, (int) this.rect.height, this);
+		
+		this.hitboxes = new Array<Hitbox>();		
+		this.hitboxes.add(hitbox, boxCastBottom, boxCastBottomLeft, boxCastBottomRight);
+		this.hitboxes.add(boxCastLeft, boxCastRight);
+	}
+	
 	protected void updatePoly() {
 		this.poly = new Polygon(new float[] {
-			rect.x, rect.y,
-			rect.x, rect.y + rect.height,
-			rect.x + rect.width, rect.y + rect.height,
-			rect.x + rect.width, rect.y
+				rect.x, rect.y, // bottom left
+				rect.x, (rect.y + rect.height + rect.y) / 2, // middle left
+				rect.x, rect.y + rect.height, // top left
+				(rect.x + rect.width + rect.x) / 2, rect.y + rect.height, //top middle
+				rect.x + rect.width, rect.y + rect.height, // top right
+				rect.x + rect.width, (rect.y + rect.height + rect.y) / 2, //middle right
+				rect.x + rect.width, rect.y, // bottom right
+				(rect.x + rect.width + rect.x) / 2, rect.y //bottom middle
 		});	
 		this.poly.setRotation((float)Math.toDegrees(angle));
 	}
@@ -88,11 +123,14 @@ public class Entity {
 		
 		if(!grounded && affectedByGravity) {
 			acceleration.y = Refs.GRAVITY;
+		} else if(grounded && affectedByGravity) {
+			acceleration.y = 0;
 		}
 		move(delta);
 		accelerate(delta);
-		updatePoly();
 		
+		updatePoly();
+		hitbox.updateHitbox(delta);
 	}
 
 	public void accelerate(float delta) {
@@ -123,11 +161,9 @@ public class Entity {
 	}
 	
 	private void collideY(Rectangle r) {
-		if(velocity.y < 0) {
+		if(velocity.y <= 0) {
 			rect.y = r.y + r.height + 0.01f;
-			if(affectedByGravity) {
-				grounded = true;
-			}
+			grounded = true;
 		} else {
 			rect.y = r.y - rect.height - 0.01f;
 		}
@@ -136,6 +172,8 @@ public class Entity {
 	
 	//collidable rects
 	Rectangle[] cRects = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
+	Polygon[] cPolys = {new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon()};
+	float[] cPolyRotations = {0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f};
 	Array<Entity> collidableEntities = new Array<Entity>();
 	
 	private void polyCollideRect(Polygon p, Rectangle r) {
@@ -147,41 +185,133 @@ public class Entity {
 		});	
 	}
 	
+	Array<Vector2> getPolygonVertices(Polygon polygon) {
+	    float[] vertices = polygon.getTransformedVertices();
+
+	    Array<Vector2> result = new Array<>();
+	    for (int i = 0; i < vertices.length/2; i++) {
+	        float x = vertices[i * 2];
+	        float y = vertices[i * 2 + 1];
+	        result.add(new Vector2(x, y));
+	    }
+	    return result;
+	}
+	
 	public void move(float delta) {
 		boolean collidedX = false;
 		boolean collidedY = false;
 		
+		boolean collidedBottom = false;
+		collidedSlope = false;
+		
+		boolean alreadyMovedY = false;
+		
 		rect.x += velocity.x * delta;
-		fetchCollidableRects();
-		for(int i = 0; i < cRects.length; i++) {
-			if(rect.overlaps(cRects[i])) {
-				collideX(cRects[i]);
-				collidedX = true;
-				if(breakOnCollide) {
-					remove = true;
-				}
+		
+		if(lockToSlope) {
+			if(goingUpSlope) {
+				rect.y += Math.abs(velocity.x) * delta;
+			} else {
+				rect.y -= Math.abs(velocity.x) * delta*delta;
 			}
+			alreadyMovedY = true;
 		}
 		
+		fetchCollidableRects();
+		
+		updatePoly();
 		
 		// only do friction if momentum is the same direction as the key being held
 		if(!(Gdx.input.isKeyPressed(Input.Keys.A) && velocity.x < 0) && !(Gdx.input.isKeyPressed(Input.Keys.D) && velocity.x > 0)) {
 			doFriction(delta);
 		}
 		
-		rect.y += velocity.y * delta;
-		fetchCollidableRects();
+		grounded = false;
+		
+		Vector2 bottomVertex = hitbox.bottomVertices.get(1);
+		
+		// TODO: fix this shit right now	vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+		// slope collisions
+		for(int i = 0; i < cPolys.length; i++) {
+			for(Vector2 vertex : this.getPolygonVertices(this.poly)) {
+				if(cPolys[i].contains(vertex)) {
+					bottomVertex = vertex;
+					collidedBottom = true;
+					float amountCollidedX = 0;
+					
+					if(cPolys[i].getRotation() == 0.0) {
+						amountCollidedX = vertex.x - cPolys[i].getBoundingRectangle().getX();
+						goingUpSlope = true;
+						goingUpSlope = velocity.x > 0;
+					} else if(cPolys[i].getRotation() == 270.0) {
+						amountCollidedX = cPolys[i].getBoundingRectangle().getX()+Refs.TEXTURE_SIZE-vertex.x;
+						goingUpSlope = velocity.x < 0;
+					}
+					if(!alreadyMovedY) {
+						this.rect.y = cPolys[i].getBoundingRectangle().getY() + amountCollidedX;
+					}
+					collidedSlope = true;
+					affectedByGravity = true;
+					grounded = true;
+					
+					velocity.y = 0;
+					acceleration.y = 0;
+					
+					if(breakOnCollide) {
+						remove = true;
+					}
+				}
+			}
+		}
+				
 		for(int i = 0; i < cRects.length; i++) {
-			if(rect.overlaps(cRects[i])) {
-				collidedY = true;
-				collideY(cRects[i]);
+			if(((this.boxCastBottomLeft.hitboxRect.overlaps(cRects[i]))
+					|| this.boxCastBottomRight.hitboxRect.overlaps(cRects[i]))
+					&& !(this.boxCastLeft.hitboxRect.overlaps(cRects[i]) || this.boxCastRight.hitboxRect.overlaps(cRects[i]))) {
+			} else if(this.rect.overlaps(cRects[i])) {
+				if(collidedSlope) {
+				} else {
+					collideX(cRects[i]);
+					collidedX = true;
+				}
+				
 				if(breakOnCollide) {
 					remove = true;
 				}
-				
 			}
 		}
 		
+		if(collidedSlope) {
+			lastOnSlope = TimeUtils.millis();
+		}
+		
+		if(TimeUtils.millis() - lastOnSlope > 25) {
+			lockToSlope = false;
+		} else {
+			lockToSlope = true;
+		}
+		if(!lockToSlope) {
+			rect.y += velocity.y * delta;
+			fetchCollidableRects();
+			for(int i = 0; i < cRects.length; i++) {
+				if(rect.overlaps(cRects[i])) {
+					if(collidedSlope) {
+						
+					}
+					collidedY = true;
+					collideY(cRects[i]);
+					
+					if(breakOnCollide) {
+						remove = true;
+					}
+					
+				}
+				if(cRects[i].overlaps(this.boxCastBottom.hitboxRect)) {
+					collidedBottom = true;
+				}
+			}
+		}
+			
 		this.collidedNone = !collidedX && !collidedY; 
 		
 		for(int i = 0; i < collidableEntities.size; i++) {
@@ -233,8 +363,29 @@ public class Entity {
 		}
 	}
 	
+	private void setCRectsPolys(int px, int py, int index) {
+		Array<Array<Float>> rotations = map.tileRotations;
+		
+		if(map.tileTypes.get(map.height - 1 - py).get(px).equals("full")) {
+			cRects[index].set(px*Refs.TEXTURE_SIZE, py*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+		} else if(map.tileTypes.get(map.height - 1 - py).get(px).equals("slope45")){
+			cPolys[index].setVertices(new float[] {
+					px * Refs.TEXTURE_SIZE, py * Refs.TEXTURE_SIZE,
+					(px+1) * Refs.TEXTURE_SIZE, (py+1) * Refs.TEXTURE_SIZE,
+					(px+1) * Refs.TEXTURE_SIZE, py * Refs.TEXTURE_SIZE,
+			});
+			//rotate
+			float rotation = map.tileRotations.get(map.height - 1 - py).get(px);
+			cPolys[index] = PolyUtils.rotateAboutCenter(cPolys[index], rotation);
+			cPolyRotations[index] = rotation;
+		}
+	}
+	
 	public void fetchCollidableRects() {
 		Array<Array<Integer>> tiles = map.mapLayout;
+		Polygon[] newCPolys = {new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon()};
+		cPolys = newCPolys;
+		
 		//bottom left
 		int p1x = (int)(rect.x / Refs.TEXTURE_SIZE);
 		int p1y = (int)Math.floor(rect.y / Refs.TEXTURE_SIZE);
@@ -278,46 +429,44 @@ public class Entity {
 			int tile7 = tiles.get(map.height - 1 - p7y).get(p7x);
 			int tile8 = tiles.get(map.height - 1 - p8y).get(p8x);
 			
-			System.out.println(p1x);
-			System.out.println(p1y);
-			
 			if(tile1 >= 1) {
-				cRects[0].set(p1x*Refs.TEXTURE_SIZE, p1y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p1x, p1y, 0);
+				
 			} else {
 				cRects[0].set(-1, -1, 0, 0);
 			}
 			if(tile2 >= 1) {
-				cRects[1].set(p2x*Refs.TEXTURE_SIZE, p2y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p2x, p2y, 1);
 			} else {
 				cRects[1].set(-1, -1, 0, 0);
 			}
 			if(tile3 >= 1) {
-				cRects[2].set(p3x*Refs.TEXTURE_SIZE, p3y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p3x, p3y, 2);
 			} else {
 				cRects[2].set(-1, -1, 0, 0);
 			}
 			if(tile4 >= 1) {
-				cRects[3].set(p4x*Refs.TEXTURE_SIZE, p4y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p4x, p4y, 3);
 			} else {
 				cRects[3].set(-1, -1, 0, 0);
 			}
 			if(tile5 >= 1) {
-				cRects[4].set(p5x*Refs.TEXTURE_SIZE, p5y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p5x, p5y, 4);
 			} else {
 				cRects[4].set(-1, -1, 0, 0);
 			}
 			if(tile6 >= 1) {
-				cRects[5].set(p6x*Refs.TEXTURE_SIZE, p6y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p6x, p6y, 5);
 			} else {
 				cRects[5].set(-1, -1, 0, 0);
 			}
 			if(tile7 >= 1) {
-				cRects[6].set(p7x*Refs.TEXTURE_SIZE, p7y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p7x, p7y, 6);
 			} else {
 				cRects[6].set(-1, -1, 0, 0);
 			}
 			if(tile8 >= 1) {
-				cRects[7].set(p8x*Refs.TEXTURE_SIZE, p8y*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
+				setCRectsPolys(p8x, p8y, 7);
 			} else {
 				cRects[7].set(-1, -1, 0, 0);
 			}

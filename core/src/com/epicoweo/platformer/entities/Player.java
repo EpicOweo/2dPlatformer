@@ -11,7 +11,6 @@ import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.items.weapons.Pistol;
 import com.epicoweo.platformer.items.weapons.Weapon;
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
 import com.epicoweo.platformer.screens.GameScreen;
 
 public class Player extends Entity {
@@ -38,8 +37,6 @@ public class Player extends Entity {
 		this.maxVelocity = new Vector2(250, 500);
 		equipWeapon(new Pistol(this));
 		createTexture();
-		
-
 	}
 	
 	void createTexture() {
@@ -72,10 +69,6 @@ public class Player extends Entity {
 		if(grounded) {
 			jumped = false;
 		}
-		if(velocity.y < 0) {
-			jumped = true;
-			grounded = false;
-		}
 		
 		if(velocity.y > 490) {
 			velocity.y = 490;
@@ -87,19 +80,9 @@ public class Player extends Entity {
 			}
 		}
 		
-		checkDash();
-		
-		checkWallFrames();
-		processInput();
-		
-		this.onWall = false;
-		
-		accelerate(delta);
-		move(delta);
-		if(this.onWall) {
-			framesOnWall += 1;
-		} else {
-			framesOnWall = 0;
+		if(velocity.y < 0) {
+			jumped = true;
+			grounded = false;
 		}
 		if(!grounded && affectedByGravity) {
 			if(onWall && velocity.y < 0) {
@@ -112,7 +95,29 @@ public class Player extends Entity {
 			} else {
 				acceleration.y = Refs.GRAVITY;
 			}
+		} else if(!affectedByGravity) {
+			acceleration.y = 0;
 		}
+		checkDash();
+		
+		checkWallFrames();
+		processInput();
+		
+		this.onWall = false;
+		accelerate(delta);
+		move(delta);
+		
+		
+		for(Hitbox h : this.hitboxes) {
+			h.updateHitbox(delta);
+		}
+		if(this.onWall) {
+			framesOnWall += 1;
+		} else {
+			framesOnWall = 0;
+		}
+		
+		
 	}
 	
 	public void updateWithFlyMode(float delta) {
@@ -168,11 +173,13 @@ public class Player extends Entity {
 	}
 	
 	public void jump() {
+		System.out.println("jump");
 		onWall = false;
 		velocity.y += jumpVelocity;
 	}
 	
 	public void wallJump() {
+		System.out.println("walljump");
 		onWall = false;
 		velocity.y += jumpVelocity;
 		if(lastSideCollided == 0) { //if going left, jump right
@@ -195,6 +202,10 @@ public class Player extends Entity {
 	}
 	
 	public void processInputFlyMode() {
+		if(Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+			toggleFlyMode();
+			return;
+		}
 		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
 			velocity.x = -1 * movementSpeed;
 			if(direction == "right") {
@@ -255,6 +266,11 @@ public class Player extends Entity {
 			acceleration.x = 0;
 		}
 		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+			System.out.println("grounded " + grounded);
+			System.out.println("jumped " + jumped);
+			System.out.println("onwall " + onWall);
+			System.out.println("walljumped " + wallJumped);
+			System.out.println("dashed " + dashed);
 			if(grounded && !jumped) {
 				jump();
 				jumped = true;

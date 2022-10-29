@@ -35,6 +35,7 @@ public class Refs {
 	public static SpriteBatch batch;
 	public static ShapeRenderer renderer;
 	public static OrthographicCamera camera;
+	public static OrthographicCamera debugCamera;
 	
 	public static void updateUtils(PlatformerGame g, SpriteBatch b, ShapeRenderer r,
 			OrthographicCamera c) {

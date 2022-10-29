@@ -34,6 +34,12 @@
 			"rotation": 0
 		},
 		"0": { 
+			"coords": [3, 1],
+			"textureId": 1,
+			"type": "slope45",
+			"rotation": 0
+		},
+		"0": { 
 			"coords": [4, 0],
 			"textureId": 1,
 			"type": "full",

@@ -2,7 +2,6 @@ package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.math.Vector2;
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
 
 public class Enemy extends Entity {
 

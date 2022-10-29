@@ -8,7 +8,9 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
@@ -21,64 +23,70 @@ import com.epicoweo.platformer.entities.Entity;
 import com.epicoweo.platformer.entities.FlailEnemy;
 import com.epicoweo.platformer.entities.Player;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
+import com.epicoweo.platformer.etc.PolyUtils;
 import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
+import com.epicoweo.platformer.maps.Level1;
 
 public class GameScreen implements Screen {
 	
 	final PlatformerGame game;
 	OrthographicCamera camera;
 	Array<Rectangle> rects;
-	Array<Rectangle> mapRects;
+	public Array<Rectangle> mapRects;
+	public Array<Polygon> mapPolys;
 	Array<Projectile> projectiles;
 	Array<Enemy> enemies;
-	Array<Texture> textures;
+	Array<Texture> fullTextures;
+	Array<Texture> slope45Textures;
 	public static Player player;
 	JsonMap map;
 	boolean showVectors = false;
+	boolean showHitboxes = false;
 	
 	public GameScreen(final PlatformerGame game) {
 		this.game = game;
 		this.rects = new Array<Rectangle>();
 		this.mapRects = new Array<Rectangle>();
+		this.mapPolys = new Array<Polygon>();
 		this.enemies = new Array<Enemy>();
-		this.textures = new Array<Texture>();
+		this.fullTextures = new Array<Texture>();
+		this.slope45Textures = new Array<Texture>();
 		this.projectiles = new Array<Projectile>();
 		
-		camera = new OrthographicCamera();
-		//camera.setToOrtho(false, Refs.APP_LENGTH, Refs.APP_WIDTH);
-		camera.setToOrtho(false, Refs.APP_LENGTH / 2, Refs.APP_WIDTH / 2);
-		camera.position.set(camera.viewportWidth / 2f, camera.viewportHeight / 2f, 0);
-		camera.update();
-		Refs.camera = camera;
-		
+		setupCamera();
 		loadTextures();
 		try {
-			this.map = new JsonMap("../assets/levels/level_skeleton.json");
+			this.map = new Level1();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		loadMap();
 		createPlayer(map.playerSpawn.x, map.playerSpawn.y, 20, 32, map);
-		//loadEntities();
+		loadEntities();
 		Refs.updateEntities(player, projectiles, enemies);
 	}
 	
+	void setupCamera() {
+		camera = new OrthographicCamera();
+		camera.setToOrtho(false, Refs.APP_LENGTH / 2, Refs.APP_WIDTH / 2);
+		camera.position.set(camera.viewportWidth / 2f, camera.viewportHeight / 2f, 0);
+		camera.update();
+		Refs.camera = camera;
+	}
+	
 	void loadTextures() {
-		this.textures.add(new Texture("../assets/textures/tiles/stone.png"));
-		this.textures.add(new Texture("../assets/textures/tiles/grass.png"));
-		this.textures.add(new Texture("../assets/textures/tiles/dirt.png"));
-		this.textures.add(new Texture("../assets/textures/tiles/brick_full_1.png"));
-		this.textures.add(new Texture("../assets/textures/tiles/brick_half_1.png"));
-		this.textures.add(new Texture("../assets/textures/tiles/brick_bg_1.png"));
+		this.fullTextures.add(new Texture("../assets/textures/tiles/stone.png"));
+		this.fullTextures.add(new Texture("../assets/textures/tiles/grass.png"));
+		this.fullTextures.add(new Texture("../assets/textures/tiles/dirt.png"));
+		
+		this.slope45Textures.add(new Texture("../assets/textures/tiles/stone_45.png"));
 	}
 	
 	void loadEntities() {
 		for(int i = 0; i < map.width; i++) {
 			for(int j = 0; j < map.height; j++) {
-				if (map.mapEntities.get(i).get(j) == 1) {
+				if (map.mapEntities.get(j).get(i) == 1) {
 					enemies.add(new FlailEnemy(new Vector2(Refs.TEXTURE_SIZE * (j+0.5f),Refs.TEXTURE_SIZE *(map.mapEntities.size - i+0.5f)), Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, map));
 				}
 			}
@@ -87,13 +95,38 @@ public class GameScreen implements Screen {
 	}
 	
 	void loadMap() {
+		map.renderBackground();
 		game.batch.setProjectionMatrix(camera.combined);
 		game.batch.begin();
+		mapPolys.clear();
 		for(int i = 0; i < map.width; i++) {
 			for(int j = 0; j < map.height; j++) {
 				if (map.mapLayout.get(j).get(i) >= 1) {
-					mapRects.add(new Rectangle((map.width - 1 - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
-					game.batch.draw(textures.get(map.mapLayout.get(j).get(i)-1), (map.width - 1 - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE);
+					if (map.tileTypes.get(j).get(i).equals("full")) {
+						mapRects.add(new Rectangle(i * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE));
+						game.batch.draw(fullTextures.get(map.mapLayout.get(j).get(i)-1), i * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE);
+					} else if (map.tileTypes.get(j).get(i).equals("slope45")) {
+						Polygon tile = new Polygon(new float[] {
+								(map.width - 1 - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE,
+								(map.width - i) * Refs.TEXTURE_SIZE, (map.height - j) * Refs.TEXTURE_SIZE,
+								(map.width - i) * Refs.TEXTURE_SIZE, (map.height - 1 - j) * Refs.TEXTURE_SIZE,
+						});
+						Sprite sprite = new Sprite(slope45Textures.get(map.mapLayout.get(j).get(i)-1));
+						Rectangle boundingRect = tile.getBoundingRectangle();
+						float x = boundingRect.getX();
+						float y = boundingRect.getY();
+						
+						//tile.setRotation(map.tileRotations.get(j).get(i));
+						
+						tile = PolyUtils.rotateAboutCenter(tile, map.tileRotations.get(j).get(i));
+						//tile.setPosition(x, y);
+						
+						mapPolys.add(tile);
+						
+						sprite.setRotation(tile.getRotation());
+						sprite.setPosition((map.width - 1) * Refs.TEXTURE_SIZE - x, y);
+						sprite.draw(game.batch);
+					}
 					
 				}
 			}
@@ -131,21 +164,17 @@ public class GameScreen implements Screen {
 	public void render(float delta) {
 		ScreenUtils.clear(0, 0, 0, 1);
 		camera.update();
-		
-		DebugOverlay debugOverlay = new DebugOverlay(game.batch, game.font, delta, showVectors);
 		loadMap();
 		player.update(delta);
 		for(Enemy e : enemies) {
 			e.update(delta);
 		}
 		moveCamera();
-		debugOverlay.render();
 		
 		game.renderer.setProjectionMatrix(camera.combined);
 		game.renderer.begin(ShapeType.Filled);
 		game.renderer.setColor(Color.WHITE);
 		for(Rectangle rect : rects) {
-			System.out.println(rect.x + " " + rect.y + " " + rect.width + " " + rect.height);
 			game.renderer.rect(rect.x, rect.y, rect.width, rect.height);
 		}
 		
@@ -183,6 +212,9 @@ public class GameScreen implements Screen {
 		game.batch.draw(player.texture, playerRect.x, playerRect.y);
 		game.batch.end();
 		
+		DebugOverlay debugOverlay = new DebugOverlay(game.batch, game.font, delta, showVectors, showHitboxes);
+		debugOverlay.render();
+		
 		
 		projectiles = player.weapon.currentProjectiles;
 		Refs.updateEntities(player, projectiles, enemies);
@@ -197,9 +229,15 @@ public class GameScreen implements Screen {
 		if(Gdx.input.isKeyJustPressed(Input.Keys.V)) {
 			showVectors = !showVectors;
 		}
+		if(Gdx.input.isKeyJustPressed(Input.Keys.H)) {
+			showHitboxes = !showHitboxes;
+		}
+		if(Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+			game.setScreen(game.debugScreen);
+		}
 
 	}
-
+	
 	@Override
 	public void resize(int width, int height) {
 		// TODO Auto-generated method stub
@@ -226,7 +264,10 @@ public class GameScreen implements Screen {
 
 	@Override
 	public void dispose() {
-		for(Texture t : textures) {
+		for(Texture t : fullTextures) {
+			t.dispose();
+		}
+		for(Texture t : slope45Textures) {
 			t.dispose();
 		}
 

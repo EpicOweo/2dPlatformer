@@ -1,14 +1,14 @@
 package com.epicoweo.platformer.maps;
 
-public class Level1 extends Map {
+import java.io.IOException;
 
-	private static String path = "../assets/levels/level1.txt";
-	public static int height = 50;
-	public static int width = 50;
-	// TODO: fix width and height having to be the same
+public class Level1 extends JsonMap {
+
+	private static String levelPath = "../assets/levels/map_2.json";
+	private static String backgroundPath = "../assets/textures/levels/level_skeleton.png";
 	
-	public Level1() {
-		super(path, width, height);
+	public Level1() throws IOException {
+		super(levelPath, backgroundPath);
 	}
 
 }

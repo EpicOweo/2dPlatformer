@@ -12,8 +12,9 @@ public class DebugOverlay extends Overlay {
 	BitmapFont font;
 	float fps;
 	boolean showVectors;
+	boolean showHitboxes;
 	
-	public DebugOverlay(SpriteBatch batch, BitmapFont font, float delta, boolean showVectors) {
+	public DebugOverlay(SpriteBatch batch, BitmapFont font, float delta, boolean showVectors, boolean showHitboxes) {
 		this.batch = new SpriteBatch();
 		this.font = font;
 		this.fps = 1/delta;
@@ -21,6 +22,10 @@ public class DebugOverlay extends Overlay {
 		if(showVectors) {
 			VectorOverlay vOverlay = new VectorOverlay(delta);
 			vOverlay.render();
+		}
+		if(showHitboxes) {
+			HitboxOverlay hOverlay = new HitboxOverlay(delta);
+			hOverlay.render();
 		}
 	}
 	
@@ -38,6 +43,7 @@ public class DebugOverlay extends Overlay {
 		font.draw(batch, "Press V to show vectors.", (float)(0.85*Refs.APP_LENGTH), (float)(0.95*Refs.APP_WIDTH));
 		font.draw(batch, "Press R to respawn.", (float)(0.85*Refs.APP_LENGTH), (float)(0.90*Refs.APP_WIDTH));
 		font.draw(batch, "Press F to toggle fly mode.", (float)(0.85*Refs.APP_LENGTH), (float)(0.85*Refs.APP_WIDTH));
+		font.draw(batch, "Press H to show hitboxes.", (float)(0.85*Refs.APP_LENGTH), (float)(0.80*Refs.APP_WIDTH));
 		batch.end();
 		batch.dispose();
 	}

@@ -2,7 +2,6 @@ package com.epicoweo.platformer.entities.projectiles;
 
 import com.epicoweo.platformer.entities.Entity;
 import com.epicoweo.platformer.maps.JsonMap;
-import com.epicoweo.platformer.maps.Map;
 
 public class Projectile extends Entity {
 
