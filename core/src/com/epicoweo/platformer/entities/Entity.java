@@ -13,6 +13,9 @@ import com.epicoweo.platformer.entities.projectiles.Projectile;
 import com.epicoweo.platformer.etc.PolyUtils;
 import com.epicoweo.platformer.etc.Refs;
 import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.tiles.GravitySwapTile;
+import com.epicoweo.platformer.tiles.SpeedBoostTile;
+import com.epicoweo.platformer.tiles.Tile.TileType;
 
 public class Entity {
 
@@ -20,6 +23,7 @@ public class Entity {
 	protected Polygon poly;
 	public Vector2 velocity;
 	public Vector2 maxVelocity;
+	public Vector2 maxAerialVelocity;
 	public Vector2 acceleration;
 	public int movementSpeed;
 	boolean affectedByGravity;
@@ -39,6 +43,11 @@ public class Entity {
 	protected long lastOnSlope = 0;
 	boolean goingUpSlope = false;
 	boolean lockToSlope = true;
+	public int inverted = 1; //-1 yes, 1 no
+	public boolean readyToInvert = false;
+	public long lastReadyToInvert = 0;
+	
+	public long lastSwappedGravity = 0;
 	
 	public Hitbox hitbox;
 	public Hitbox boxCastLeft;
@@ -49,7 +58,7 @@ public class Entity {
 	
 	public Array<Hitbox> hitboxes;
 	
-	public int friction = 500;
+	public int friction = 750;
 	
 	public Entity(float x, float y, int width, int height, JsonMap map, boolean affectedByGravity) {
 		this.rect = new Rectangle(x, y, width, height);
@@ -75,11 +84,11 @@ public class Entity {
 
 	private void createHitboxes(int width, int height) {
 		this.hitbox = new Hitbox(width-2, height-1, this);
-		this.boxCastBottom = new BoxCast(0, -5, width - 2, 10, this);
-		this.boxCastBottomLeft = new BoxCast(-5, -5, 10, 10, this);
-		this.boxCastBottomRight = new BoxCast(this.rect.width - 5, -5, 10, 10, this);
-		this.boxCastLeft = new BoxCast(-5, 5, 10, (int) this.rect.height, this);
-		this.boxCastRight = new BoxCast(this.rect.width-5, 5, 10, (int) this.rect.height, this);
+		this.boxCastBottom = new BoxCast(0, -2, width - 2, 5, this);
+		this.boxCastBottomLeft = new BoxCast(-2, -2, 5, 5, this);
+		this.boxCastBottomRight = new BoxCast(this.rect.width - 2, -2, 5, 5, this);
+		this.boxCastLeft = new BoxCast(-2, 2, 5, (int) this.rect.height, this);
+		this.boxCastRight = new BoxCast(this.rect.width-2, 2, 5, (int) this.rect.height, this);
 		
 		this.hitboxes = new Array<Hitbox>();		
 		this.hitboxes.add(hitbox, boxCastBottom, boxCastBottomLeft, boxCastBottomRight);
@@ -161,12 +170,22 @@ public class Entity {
 	}
 	
 	private void collideY(Rectangle r) {
-		if(velocity.y <= 0) {
-			rect.y = r.y + r.height + 0.01f;
-			grounded = true;
+		if(inverted == 1) {
+			if(velocity.y <= 0) {
+				rect.y = r.y + r.height + 0.01f;
+				grounded = true;
+			} else {
+				rect.y = r.y - rect.height - 0.01f;
+			}
 		} else {
-			rect.y = r.y - rect.height - 0.01f;
+			if(velocity.y >= 0) {
+				rect.y = r.y - rect.height - 0.01f;
+				grounded = true;
+			} else {
+				rect.y = r.y + r.height + 0.01f;
+			}
 		}
+		
 		velocity.y = 0;
 	}
 	
@@ -174,6 +193,7 @@ public class Entity {
 	Rectangle[] cRects = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
 	Polygon[] cPolys = {new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon()};
 	float[] cPolyRotations = {0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f};
+	String[] cTileTypes = {"","","","","","","",""};
 	Array<Entity> collidableEntities = new Array<Entity>();
 	
 	private void polyCollideRect(Polygon p, Rectangle r) {
@@ -200,8 +220,6 @@ public class Entity {
 	public void move(float delta) {
 		boolean collidedX = false;
 		boolean collidedY = false;
-		
-		boolean collidedBottom = false;
 		collidedSlope = false;
 		
 		boolean alreadyMovedY = false;
@@ -228,15 +246,10 @@ public class Entity {
 		
 		grounded = false;
 		
-		Vector2 bottomVertex = hitbox.bottomVertices.get(1);
-		
-		// TODO: fix this shit right now	vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 		// slope collisions
 		for(int i = 0; i < cPolys.length; i++) {
 			for(Vector2 vertex : this.getPolygonVertices(this.poly)) {
 				if(cPolys[i].contains(vertex)) {
-					bottomVertex = vertex;
-					collidedBottom = true;
 					float amountCollidedX = 0;
 					
 					if(cPolys[i].getRotation() == 0.0) {
@@ -301,13 +314,30 @@ public class Entity {
 					collidedY = true;
 					collideY(cRects[i]);
 					
+					int rectPtX = Math.round(cRects[i].x / Refs.TEXTURE_SIZE);
+					int rectPtY = Math.round(cRects[i].y / Refs.TEXTURE_SIZE);
+					if((map.mapTiles.get(rectPtY).get(rectPtX) instanceof GravitySwapTile
+					|| map.mapTiles.get(rectPtY).get(rectPtX) instanceof SpeedBoostTile)
+							&& this instanceof Player) {
+						map.mapTiles.get(rectPtY).get(rectPtX).activateSpecialEffect();
+					}
+					
 					if(breakOnCollide) {
 						remove = true;
 					}
 					
 				}
-				if(cRects[i].overlaps(this.boxCastBottom.hitboxRect)) {
-					collidedBottom = true;
+			}
+			for(Rectangle r : map.platformRects) {
+				if(rect.overlaps(r)) {
+					System.out.println(rect.y);
+					System.out.println(r.y);
+					System.out.println(r.height);
+					System.out.println();
+					if(rect.y <= r.y + r.height && velocity.y <= 0) {
+						collidedY = true;
+						collideY(r);
+					}
 				}
 			}
 		}
@@ -364,8 +394,10 @@ public class Entity {
 	}
 	
 	private void setCRectsPolys(int px, int py, int index) {
-		Array<Array<Float>> rotations = map.tileRotations;
-		
+		if(cTileTypes[index] == "platform") {
+			cRects[index].set(-1, -1, 0, 0);
+			return;
+		}
 		if(map.tileTypes.get(map.height - 1 - py).get(px).equals("full")) {
 			cRects[index].set(px*Refs.TEXTURE_SIZE, py*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
 		} else if(map.tileTypes.get(map.height - 1 - py).get(px).equals("slope45")){
@@ -431,42 +463,49 @@ public class Entity {
 			
 			if(tile1 >= 1) {
 				setCRectsPolys(p1x, p1y, 0);
-				
+				cTileTypes[0] = map.tileTypes.get(map.height - 1 - p1y).get(p1x);
 			} else {
 				cRects[0].set(-1, -1, 0, 0);
 			}
 			if(tile2 >= 1) {
 				setCRectsPolys(p2x, p2y, 1);
+				cTileTypes[1] = map.tileTypes.get(map.height - 1 - p2y).get(p2x);
 			} else {
 				cRects[1].set(-1, -1, 0, 0);
 			}
 			if(tile3 >= 1) {
 				setCRectsPolys(p3x, p3y, 2);
+				cTileTypes[2] = map.tileTypes.get(map.height - 1 - p3y).get(p3x);
 			} else {
 				cRects[2].set(-1, -1, 0, 0);
 			}
 			if(tile4 >= 1) {
 				setCRectsPolys(p4x, p4y, 3);
+				cTileTypes[3] = map.tileTypes.get(map.height - 1 - p4y).get(p4x);
 			} else {
 				cRects[3].set(-1, -1, 0, 0);
 			}
 			if(tile5 >= 1) {
 				setCRectsPolys(p5x, p5y, 4);
+				cTileTypes[4] = map.tileTypes.get(map.height - 1 - p5y).get(p5x);
 			} else {
 				cRects[4].set(-1, -1, 0, 0);
 			}
 			if(tile6 >= 1) {
 				setCRectsPolys(p6x, p6y, 5);
+				cTileTypes[5] = map.tileTypes.get(map.height - 1 - p6y).get(p6x);
 			} else {
 				cRects[5].set(-1, -1, 0, 0);
 			}
 			if(tile7 >= 1) {
 				setCRectsPolys(p7x, p7y, 6);
+				cTileTypes[6] = map.tileTypes.get(map.height - 1 - p7y).get(p7x);
 			} else {
 				cRects[6].set(-1, -1, 0, 0);
 			}
 			if(tile8 >= 1) {
 				setCRectsPolys(p8x, p8y, 7);
+				cTileTypes[7] = map.tileTypes.get(map.height - 1 - p8y).get(p8x);
 			} else {
 				cRects[7].set(-1, -1, 0, 0);
 			}

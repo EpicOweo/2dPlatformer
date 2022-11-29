@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.TimeUtils;
 import com.epicoweo.platformer.etc.Refs;
@@ -15,17 +16,23 @@ import com.epicoweo.platformer.screens.GameScreen;
 
 public class Player extends Entity {
 
-	int jumpVelocity = 490;
-	int dashVelocityX = 300;
-	int dashVelocityY = 400;
-	int aerialXAcceleration = 500;
+	int jumpVelocity = 200;
+	int dashVelocityX = 200;
+	int dashVelocityY = 200;
+	int maxDashVelocity = 200;
+	int aerialXAcceleration = 250;
 	boolean jumped = false;
 	boolean dashed = false;
 	public Weapon weapon;
 	long lastDash = 0;
+	boolean dashing = false;
 	int framesOnWall = 0; //number of frames the player has been on the wall
 	public Texture texture;
+	public Texture invertedTexture;
 	String direction = "left";
+	public long lastOnSpeedBoost = 0;
+	
+	public Rectangle sectIn;
 	
 	public boolean flyMode = false;
 	
@@ -33,24 +40,32 @@ public class Player extends Entity {
 	
 	public Player(float x, float y, int width, int height, JsonMap map) {
 		super(x, y, width, height, map, true);
-		this.movementSpeed = 250;
-		this.maxVelocity = new Vector2(250, 500);
+		this.movementSpeed = 200;
+		this.maxVelocity = new Vector2(150, 200);
+		this.sectIn = new Rectangle();
 		equipWeapon(new Pistol(this));
 		createTexture();
 	}
 	
 	void createTexture() {
 		Pixmap pixmap16 = new Pixmap(Gdx.files.internal("../assets/textures/player/player_" + direction + ".png"));
-		Pixmap pixmap32 = new Pixmap(20, 32, pixmap16.getFormat());
-		pixmap32.setFilter(Pixmap.Filter.NearestNeighbour);
-		pixmap32.drawPixmap(pixmap16,
-		        0, 0, pixmap16.getWidth(), pixmap16.getHeight(),
-		        0, 0, pixmap32.getWidth(), pixmap32.getHeight()
-		);
-		texture = new Texture(pixmap32);
+		texture = new Texture(pixmap16);
+		
+		final int width = pixmap16.getWidth();
+		final int height = pixmap16.getHeight();
+		
+		Pixmap invertedPixmap = new Pixmap(width, height, pixmap16.getFormat());
+		
+		for (int x = 0; x < width; x++) {
+	        for (int y = 0; y < height; y++) {
+	            invertedPixmap.drawPixel(x, y, pixmap16.getPixel(x, height - y - 1));
+	        }
+	    }
+		
+		invertedTexture = new Texture(invertedPixmap);
 		
 		pixmap16.dispose();
-		pixmap32.dispose();
+		invertedPixmap.dispose();
 	}
 	
 	@Override
@@ -63,15 +78,15 @@ public class Player extends Entity {
 		if(dead) {
 			spawn();
 		}
-		if(jumped && velocity.y > 0) {
+		if(jumped && inverted*velocity.y > 0) {
 			grounded = false;
 		}
 		if(grounded) {
 			jumped = false;
 		}
 		
-		if(velocity.y > 490) {
-			velocity.y = 490;
+		if(Math.abs(velocity.y) > maxVelocity.y) {
+			velocity.y = maxVelocity.y * Math.signum(velocity.y);
 		}
 		
 		if(Math.abs(velocity.x) < 10f) {
@@ -80,33 +95,56 @@ public class Player extends Entity {
 			}
 		}
 		
-		if(velocity.y < 0) {
+		if(-inverted*velocity.y < 0) {
 			jumped = true;
 			grounded = false;
 		}
 		if(!grounded && affectedByGravity) {
-			if(onWall && velocity.y < 0) {
+			if(onWall && inverted*velocity.y < 0) {
 				acceleration.y = 0;
-				if(Gdx.input.isKeyPressed(Keys.S)) {
-					velocity.y = -250;
+				if(inverted == 1) {
+					if(Gdx.input.isKeyPressed(Keys.S)) {
+						velocity.y = -125;
+					} else {
+						velocity.y = -50;
+					}
 				} else {
-					velocity.y = -100;
+					if(Gdx.input.isKeyPressed(Keys.W)) {
+						velocity.y = 125;
+					} else {
+						velocity.y = 50;
+					}
 				}
 			} else {
-				acceleration.y = Refs.GRAVITY;
+				acceleration.y = inverted*Refs.GRAVITY;
 			}
 		} else if(!affectedByGravity) {
 			acceleration.y = 0;
 		}
+		
+		if(TimeUtils.millis() - lastOnSpeedBoost > 500) {
+			movementSpeed = 200;
+			this.maxVelocity = new Vector2(150, 200);
+		}
+		
 		checkDash();
 		
 		checkWallFrames();
 		processInput();
 		
+		if(TimeUtils.millis() - lastReadyToInvert > 150) {
+			readyToInvert = false;
+		}
+		
 		this.onWall = false;
 		accelerate(delta);
 		move(delta);
 		
+		for(Rectangle sect : map.mapSections) {
+			if(this.rect.overlaps(sect)) {
+				this.sectIn = sect;
+			}
+		}
 		
 		for(Hitbox h : this.hitboxes) {
 			h.updateHitbox(delta);
@@ -134,22 +172,24 @@ public class Player extends Entity {
 	
 	public void checkWallFrames() {
 		if(framesOnWall > 5 && !dashed) {
-			System.out.println(framesOnWall);
 			dashed = true;
 		}
 	}
 	
 	@Override
 	public void accelerate(float delta) {
-		if(Math.abs(velocity.x) < maxVelocity.x) {
-			velocity.x += acceleration.x * delta;
-		} else {
+		velocity.x += acceleration.x * delta;
+		
+		if(Math.abs(velocity.x) > maxVelocity.x && !dashing && !dashed) {
 			velocity.x = Math.signum(velocity.x) * maxVelocity.x;
+		} else if(Math.abs(velocity.x) > maxDashVelocity && (dashing || dashed)) {
+			velocity.x = Math.signum(velocity.x) * maxDashVelocity;
 		}
-		if(Math.abs(velocity.y) < maxVelocity.y) {
-			velocity.y += acceleration.y * delta;
-		} else if(Math.abs(velocity.y) > maxVelocity.y && dashed) {
-			velocity.y += acceleration.y * delta;
+		
+		velocity.y += acceleration.y * delta;
+		
+		if(Math.abs(velocity.y) > maxVelocity.y) {
+			velocity.y = Math.signum(velocity.y) * maxVelocity.y;
 		}
 	}
 	
@@ -167,21 +207,30 @@ public class Player extends Entity {
 			affectedByGravity = true;
 		}
 		
+		if(TimeUtils.nanoTime() - lastDash < 500000000) {
+			dashing = true;
+		} else {
+			dashing = false;
+		}
+		
 		if((TimeUtils.nanoTime() - lastDash > 100000000) || !Gdx.input.isKeyPressed(Keys.SPACE)) {
 			affectedByGravity = true;
 		}
 	}
 	
 	public void jump() {
-		System.out.println("jump");
-		onWall = false;
-		velocity.y += jumpVelocity;
+		if(readyToInvert && TimeUtils.millis() - lastSwappedGravity > 100) {
+			inverted = -inverted;
+			lastSwappedGravity = TimeUtils.millis();
+		} else {
+			onWall = false;
+			velocity.y += inverted*jumpVelocity;
+		}
 	}
 	
 	public void wallJump() {
-		System.out.println("walljump");
 		onWall = false;
-		velocity.y += jumpVelocity;
+		velocity.y += inverted*jumpVelocity;
 		if(lastSideCollided == 0) { //if going left, jump right
 			velocity.x += 200;
 		} else {
@@ -243,34 +292,34 @@ public class Player extends Entity {
 			processInputFlyMode();
 		}
 		
-		//movement
-		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
-			acceleration.x = -1 * movementSpeed;
-			if(!grounded && velocity.x > 0){ // to allow better aerial control
-				acceleration.x = (100 * Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
-			}
+		if(velocity.x < 0) {
 			if(direction == "right") {
 				direction = "left";
 				createTexture();
 			}
-		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
-			acceleration.x = 1 * movementSpeed;
-			if(!grounded && velocity.x < 0){
-				acceleration.x = (100 * Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
-			}
+		} else if (velocity.x > 0) {
 			if(direction == "left") {
 				direction = "right";
 				createTexture();
+			}
+		}
+		
+		//movement
+		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
+			acceleration.x = -1 * movementSpeed;
+			if(!grounded && velocity.x > 0){ // to allow better aerial control
+				acceleration.x = (100 * -Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
+			}
+			
+		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
+			acceleration.x = 1 * movementSpeed;
+			if(!grounded && velocity.x < 0){
+				acceleration.x = (100 * -Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
 			}
 		} else {
 			acceleration.x = 0;
 		}
 		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
-			System.out.println("grounded " + grounded);
-			System.out.println("jumped " + jumped);
-			System.out.println("onwall " + onWall);
-			System.out.println("walljumped " + wallJumped);
-			System.out.println("dashed " + dashed);
 			if(grounded && !jumped) {
 				jump();
 				jumped = true;
@@ -335,13 +384,18 @@ public class Player extends Entity {
 		} else if(totalKeysPressed != 0) {
 			dashAngle = Math.toRadians(dashAngle / totalKeysPressed); // average, to radians
 		} else {
-			dashAngle = Math.toRadians(90);
+			if(inverted == 1) {
+				dashAngle = Math.toRadians(90);
+			} else {
+				dashAngle = Math.toRadians(270);
+			}
 		}
 		
 		affectedByGravity = false;
 		this.acceleration = new Vector2();
 		this.velocity = new Vector2((float)(dashVelocityX * Math.cos(dashAngle)), (float)(dashVelocityY * Math.sin(dashAngle)));
 		lastDash = TimeUtils.nanoTime();
+		dashing = true;
 	}
 	
 }
