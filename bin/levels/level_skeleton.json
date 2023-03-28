@@ -1,0 +1,97 @@
+{
+	"levelWidth": 10,
+	"levelHeight": 4,
+
+	"mapLayout": {
+		"0": { 
+			"coords": [0, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [0, 1],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [1, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [2, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [3, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [3, 1],
+			"textureId": 1,
+			"type": "slope45",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [4, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [5, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [6, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [7, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [8, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [9, 0],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		},
+		"0": { 
+			"coords": [9, 1],
+			"textureId": 1,
+			"type": "full",
+			"rotation": 0
+		}
+		
+	},
+	
+	"mapEntities": { 
+	
+	},
+	
+	"mapEtc": { 
+		"0": { 
+			"coords": [0, 0],
+			"type": 1
+		}
+	}
+}
