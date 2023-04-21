@@ -1,5 +1,10 @@
 package com.epicoweo.platformer.items.weapons;
 
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.Polygon;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.TimeUtils;
@@ -14,18 +19,24 @@ public abstract class Weapon {
 	public float lastUse;
 	public Player player;
 	public int bulletVelocity;
-	public Array<Projectile> currentProjectiles = new Array<Projectile>();;
+	public float passiveRotation = 0;
+	public Array<Projectile> currentProjectiles = new Array<Projectile>();
+	
+	public TextureRegion texture;
+	public Polygon poly;
 	
 	public Weapon(Player player, float damage, float useSpeed) {
 		this.damage = damage;
 		this.useSpeed = useSpeed; // seconds per use
 		this.lastUse = 0;
 		this.player = player;
+		
+		texture = new TextureRegion(new Texture(new Pixmap(0, 0, Format.Alpha)));
+		poly = new Polygon();
 	}
 	
 	public boolean usable() {
 		long currentTime = TimeUtils.nanoTime();
-		System.out.println(currentTime - lastUse);
 		if (currentTime - lastUse < 1000000000 * useSpeed) return false;
 		return true;
 	}
@@ -38,4 +49,5 @@ public abstract class Weapon {
 	}
 	
 	public abstract void use();
+	public abstract void update();
 }

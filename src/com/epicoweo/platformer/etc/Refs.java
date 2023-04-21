@@ -10,6 +10,13 @@ import com.epicoweo.platformer.entities.Enemy;
 import com.epicoweo.platformer.entities.Entity;
 import com.epicoweo.platformer.entities.Player;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
+import com.epicoweo.platformer.tiles.Fence;
+import com.epicoweo.platformer.tiles.GravitySwapTile;
+import com.epicoweo.platformer.tiles.OffTile;
+import com.epicoweo.platformer.tiles.OnTile;
+import com.epicoweo.platformer.tiles.Platform;
+import com.epicoweo.platformer.tiles.Stone;
+import com.epicoweo.platformer.tiles.Tile;
 
 public class Refs {
 	public static int APP_LENGTH = 1280;
@@ -65,5 +72,15 @@ public class Refs {
 	public static final String ANSI_PURPLE = "\u001B[35m";
 	public static final String ANSI_CYAN = "\u001B[36m";
 	public static final String ANSI_WHITE = "\u001B[37m";
+	
+	
+	public static void updateTiles() {
+		tiles = new Tile[] {new Stone(), new OffTile(), new OnTile(),
+				new GravitySwapTile(), new Platform()};
+	}
+	
+	public static Tile[] tiles = {new Stone(), new OffTile(), new OnTile(),
+			new GravitySwapTile(), new Platform()};
+	
 	
 }

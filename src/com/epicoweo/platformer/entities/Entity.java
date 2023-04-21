@@ -1,8 +1,8 @@
 package com.epicoweo.platformer.entities;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.Polygon;
@@ -10,12 +10,19 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.TimeUtils;
+import com.epicoweo.platformer.controller.UniversalInput;
 import com.epicoweo.platformer.entities.projectiles.Projectile;
-import com.epicoweo.platformer.etc.PolyUtils;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
+import com.epicoweo.platformer.tiles.GravitySwapDown;
 import com.epicoweo.platformer.tiles.GravitySwapTile;
-import com.epicoweo.platformer.tiles.SpeedBoostTile;
+import com.epicoweo.platformer.tiles.GreenTile;
+import com.epicoweo.platformer.tiles.NormalTile;
+import com.epicoweo.platformer.tiles.OffTile;
+import com.epicoweo.platformer.tiles.OnTile;
+import com.epicoweo.platformer.tiles.RedTile;
+import com.epicoweo.platformer.tiles.Spike;
+import com.epicoweo.platformer.tiles.Tile;
 import com.epicoweo.platformer.tiles.Tile.TileType;
 
 public class Entity {
@@ -29,7 +36,7 @@ public class Entity {
 	public int movementSpeed;
 	boolean affectedByGravity;
 	boolean grounded;
-	public JsonMap map;
+	public PNGMap map;
 	public boolean remove = false;
 	protected boolean breakOnCollide = false;
 	public boolean dead = false;
@@ -51,6 +58,9 @@ public class Entity {
 	boolean collidedAnyBlackHole = false;
 	boolean cancelCollideBlackHole = false;
 	
+	public boolean hasAnimation = false;
+	public Animation<TextureRegion> animation;
+	
 	public long lastSwappedGravity = 0;
 	public long lastCollidedBlackHole = 0;
 	public long startedCollidingBlackHole = 0;
@@ -68,7 +78,7 @@ public class Entity {
 	
 	public int friction = 750;
 	
-	public Entity(float x, float y, int width, int height, JsonMap map, boolean affectedByGravity) {
+	public Entity(float x, float y, int width, int height, PNGMap map, boolean affectedByGravity) {
 		this.rect = new Rectangle(x, y, width, height);
 		this.velocity = new Vector2(0, 0);
 		this.acceleration = new Vector2(0, 0);
@@ -194,14 +204,19 @@ public class Entity {
 			}
 		}
 		
-		velocity.y = 0;
+		if(!(this instanceof Player)) {
+			velocity.y = -velocity.y;
+		} else {
+			velocity.y = 0;
+		}
+		
 	}
 	
 	//collidable rects
 	Rectangle[] cRects = {new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle(), new Rectangle()};
 	Polygon[] cPolys = {new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon(), new Polygon()};
 	float[] cPolyRotations = {0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f};
-	String[] cTileTypes = {"","","","","","","",""};
+	Tile[] cTiles = {new NormalTile(), new NormalTile(), new NormalTile(), new NormalTile(), new NormalTile(), new NormalTile(), new NormalTile(), new NormalTile()};
 	Array<Entity> collidableEntities = new Array<Entity>();
 	
 	private void polyCollideRect(Polygon p, Rectangle r) {
@@ -248,7 +263,7 @@ public class Entity {
 		updatePoly();
 		
 		// only do friction if momentum is the same direction as the key being held
-		if(!(Gdx.input.isKeyPressed(Input.Keys.A) && velocity.x < 0) && !(Gdx.input.isKeyPressed(Input.Keys.D) && velocity.x > 0)) {
+		if(!(UniversalInput.left && velocity.x < 0) && !(UniversalInput.right && velocity.x > 0)) {
 			doFriction(delta);
 		}
 		
@@ -286,19 +301,39 @@ public class Entity {
 		}
 				
 		for(int i = 0; i < cRects.length; i++) {
-			if(((this.boxCastBottomLeft.hitboxRect.overlaps(cRects[i]))
-					|| this.boxCastBottomRight.hitboxRect.overlaps(cRects[i]))
-					&& !(this.boxCastLeft.hitboxRect.overlaps(cRects[i]) || this.boxCastRight.hitboxRect.overlaps(cRects[i]))) {
-			} else if(this.rect.overlaps(cRects[i])) {
+			if(this.rect.overlaps(cRects[i])) {
+				int rectPtX = (int) Math.floor(cRects[i].x / Refs.TEXTURE_SIZE);
+				int rectPtY = (int) Math.floor(cRects[i].y / Refs.TEXTURE_SIZE);
 				if(collidedSlope) {
 				} else {
+					if(cTiles[i].type == TileType.Background) continue;
+					if(map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof Spike) {
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).activateSpecialEffect();
+						continue;
+					}
 					collideX(cRects[i]);
 					collidedX = true;
 				}
 				
+
+				if((map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof OffTile
+						|| map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof OnTile)
+						&& this instanceof Projectile) {
+					map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).x = rectPtX;
+					map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).y = map.height-1-rectPtY;
+					map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).activateSpecialEffect();
+				}
+				
+				
 				if(breakOnCollide) {
 					remove = true;
 				}
+			}
+		}
+		for(int i = 0; i < map.outerMapRects.length; i++) {
+			if(this.rect.overlaps(map.outerMapRects[i])) {
+				collideX(map.outerMapRects[i]);
+				collidedX = true;
 			}
 		}
 		
@@ -319,21 +354,43 @@ public class Entity {
 					if(collidedSlope) {
 						
 					}
-					collidedY = true;
-					collideY(cRects[i]);
+					
+					if(cTiles[i].type == TileType.Background) continue;
 					
 					int rectPtX = Math.round(cRects[i].x / Refs.TEXTURE_SIZE);
 					int rectPtY = Math.round(cRects[i].y / Refs.TEXTURE_SIZE);
-					if((map.mapTiles.get(rectPtY).get(rectPtX) instanceof GravitySwapTile
-					|| map.mapTiles.get(rectPtY).get(rectPtX) instanceof SpeedBoostTile)
+					
+					if(cTiles[i].type == TileType.Spike) {
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).activateSpecialEffect();
+						continue;
+					}
+					collidedY = true;
+					collideY(cRects[i]);
+					
+					if((map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof GravitySwapTile)
+							|| (map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof GravitySwapDown)
 							&& this instanceof Player) {
-						map.mapTiles.get(rectPtY).get(rectPtX).activateSpecialEffect();
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).activateSpecialEffect();
+					}
+					
+					if((map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof OffTile
+							|| map.mapTiles.get(map.height-1-rectPtY).get(rectPtX) instanceof OnTile)
+							&& this instanceof Projectile) {
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).x = rectPtX;
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).y = map.height-1-rectPtY;
+						map.mapTiles.get(map.height-1-rectPtY).get(rectPtX).activateSpecialEffect();
 					}
 					
 					if(breakOnCollide) {
 						remove = true;
 					}
 					
+				}
+			}
+			for(int i = 0; i < map.outerMapRects.length; i++) {
+				if(this.rect.overlaps(map.outerMapRects[i])) {
+					collideY(map.outerMapRects[i]);
+					collidedY = true;
 				}
 			}
 			for(Rectangle r : map.platformRects) {
@@ -438,22 +495,13 @@ public class Entity {
 	}
 	
 	private void setCRectsPolys(int px, int py, int index) {
-		if(cTileTypes[index] == "platform") {
+		if(cTiles[index].type == TileType.Platform || cTiles[index].type == TileType.Background
+				|| (cTiles[index] instanceof GreenTile && !GreenTile.activated)
+				|| (cTiles[index] instanceof RedTile && !RedTile.activated)) {
 			cRects[index].set(-1, -1, 0, 0);
 			return;
-		}
-		if(map.tileTypes.get(map.height - 1 - py).get(px).equals("full")) {
+		} else {
 			cRects[index].set(px*Refs.TEXTURE_SIZE, py*Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE, Refs.TEXTURE_SIZE);
-		} else if(map.tileTypes.get(map.height - 1 - py).get(px).equals("slope45")){
-			cPolys[index].setVertices(new float[] {
-					px * Refs.TEXTURE_SIZE, py * Refs.TEXTURE_SIZE,
-					(px+1) * Refs.TEXTURE_SIZE, (py+1) * Refs.TEXTURE_SIZE,
-					(px+1) * Refs.TEXTURE_SIZE, py * Refs.TEXTURE_SIZE,
-			});
-			//rotate
-			float rotation = map.tileRotations.get(map.height - 1 - py).get(px);
-			cPolys[index] = PolyUtils.rotateAboutCenter(cPolys[index], rotation);
-			cPolyRotations[index] = rotation;
 		}
 	}
 	
@@ -506,50 +554,50 @@ public class Entity {
 			int tile8 = tiles.get(map.height - 1 - p8y).get(p8x);
 			
 			if(tile1 >= 1) {
+				cTiles[0] = map.mapTiles.get(map.height - 1 - p1y).get(p1x);
 				setCRectsPolys(p1x, p1y, 0);
-				cTileTypes[0] = map.tileTypes.get(map.height - 1 - p1y).get(p1x);
 			} else {
 				cRects[0].set(-1, -1, 0, 0);
 			}
 			if(tile2 >= 1) {
+				cTiles[1] = map.mapTiles.get(map.height - 1 - p2y).get(p2x);
 				setCRectsPolys(p2x, p2y, 1);
-				cTileTypes[1] = map.tileTypes.get(map.height - 1 - p2y).get(p2x);
 			} else {
 				cRects[1].set(-1, -1, 0, 0);
 			}
 			if(tile3 >= 1) {
+				cTiles[2] = map.mapTiles.get(map.height - 1 - p3y).get(p3x);
 				setCRectsPolys(p3x, p3y, 2);
-				cTileTypes[2] = map.tileTypes.get(map.height - 1 - p3y).get(p3x);
 			} else {
 				cRects[2].set(-1, -1, 0, 0);
 			}
 			if(tile4 >= 1) {
+				cTiles[3] = map.mapTiles.get(map.height - 1 - p4y).get(p4x);
 				setCRectsPolys(p4x, p4y, 3);
-				cTileTypes[3] = map.tileTypes.get(map.height - 1 - p4y).get(p4x);
 			} else {
 				cRects[3].set(-1, -1, 0, 0);
 			}
 			if(tile5 >= 1) {
+				cTiles[4] = map.mapTiles.get(map.height - 1 - p5y).get(p5x);
 				setCRectsPolys(p5x, p5y, 4);
-				cTileTypes[4] = map.tileTypes.get(map.height - 1 - p5y).get(p5x);
 			} else {
 				cRects[4].set(-1, -1, 0, 0);
 			}
 			if(tile6 >= 1) {
+				cTiles[5] = map.mapTiles.get(map.height - 1 - p6y).get(p6x);
 				setCRectsPolys(p6x, p6y, 5);
-				cTileTypes[5] = map.tileTypes.get(map.height - 1 - p6y).get(p6x);
 			} else {
 				cRects[5].set(-1, -1, 0, 0);
 			}
 			if(tile7 >= 1) {
+				cTiles[6] = map.mapTiles.get(map.height - 1 - p7y).get(p7x);
 				setCRectsPolys(p7x, p7y, 6);
-				cTileTypes[6] = map.tileTypes.get(map.height - 1 - p7y).get(p7x);
 			} else {
 				cRects[6].set(-1, -1, 0, 0);
 			}
 			if(tile8 >= 1) {
+				cTiles[7] = map.mapTiles.get(map.height - 1 - p8y).get(p8x);
 				setCRectsPolys(p8x, p8y, 7);
-				cTileTypes[7] = map.tileTypes.get(map.height - 1 - p8y).get(p8x);
 			} else {
 				cRects[7].set(-1, -1, 0, 0);
 			}

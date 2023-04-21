@@ -4,7 +4,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 import com.epicoweo.platformer.screens.GameScreen;
 
 public class DebugOverlay extends Overlay {
@@ -14,7 +14,7 @@ public class DebugOverlay extends Overlay {
 	float fps;
 	boolean showVectors;
 	boolean showHitboxes;
-	JsonMap map;
+	PNGMap map;
 	
 	public DebugOverlay(SpriteBatch batch, BitmapFont font, float delta, boolean showVectors, boolean showHitboxes) {
 		this.batch = new SpriteBatch();

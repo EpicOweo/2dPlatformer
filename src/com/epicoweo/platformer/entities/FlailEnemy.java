@@ -6,7 +6,7 @@ import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 
 public class FlailEnemy extends Enemy {
 
@@ -16,7 +16,7 @@ public class FlailEnemy extends Enemy {
 	int radius;
 	
 	
-	public FlailEnemy(Vector2 centerpos, int width, int height, JsonMap map) {
+	public FlailEnemy(Vector2 centerpos, int width, int height, PNGMap map) {
 		super(centerpos.x + 30, centerpos.y, width, height, map, false);
 		
 		this.centerpos = centerpos;

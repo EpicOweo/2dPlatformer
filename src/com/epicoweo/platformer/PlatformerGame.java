@@ -3,6 +3,7 @@ package com.epicoweo.platformer;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -23,12 +24,14 @@ public class PlatformerGame extends Game {
 	
 	public GameScreen gameScreen;
 	public PauseScreen debugScreen;
+	public AssetManager manager;
 	
 	Array<Rectangle> rects;
 	
 	@Override
 	public void create () {
 		batch = new SpriteBatch();
+		manager = new AssetManager();
 		
 		FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal("./assets/font/homespun.ttf"));
 		FreeTypeFontParameter parameter = new FreeTypeFontParameter();
@@ -55,6 +58,7 @@ public class PlatformerGame extends Game {
 		batch.dispose();
 		font.dispose();
 		renderer.dispose();
+		manager.dispose();
 	}
 	
 	@Override

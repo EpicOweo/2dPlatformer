@@ -6,7 +6,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Circle;
 import com.badlogic.gdx.math.Vector3;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 
 public class BlackHole extends Entity {
 
@@ -15,7 +15,7 @@ public class BlackHole extends Entity {
 	
 	public Circle pullCircle;
 	
-	public BlackHole(float x, float y, JsonMap map) {
+	public BlackHole(float x, float y, PNGMap map) {
 		super(x, y, 16, 16, map, false);
 		this.circle = new Circle(x, y, rect.width / 2);
 		this.pullCircle = new Circle(x, y, pullRadius);

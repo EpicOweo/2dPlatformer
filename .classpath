@@ -6,6 +6,8 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/LibGDX"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/GDXControllers"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/JSONSimple"/>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="assets"/>
 	<classpathentry kind="output" path="bin"/>

@@ -1,5 +1,7 @@
 package com.epicoweo.platformer.tiles;
 
+import java.util.HashMap;
+
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.epicoweo.platformer.entities.Player;
@@ -13,10 +15,15 @@ public abstract class Tile {
 	public float stateTime;
 	public Animation<TextureRegion> animation;
 	
+	
+	public boolean isVaried = false;
+	public TextureRegion texture; 
+	public HashMap<String, TextureRegion> textures; 
+	
 	Player player;
 	
 	public enum TileType {
-		Normal, GravitySwap, SpeedBoost, Platform, Background;
+		Empty, Normal, GravitySwap, Platform, Background, Foreground, OnOff, Spike;
 	}
 	
 	public Tile(TileType t) {

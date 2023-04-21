@@ -10,13 +10,13 @@ import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.epicoweo.platformer.PlatformerGame;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 import com.epicoweo.platformer.ui.Button;
 
 public class PauseScreen implements Screen {
 
 	final PlatformerGame game;
-	public JsonMap map;
+	public PNGMap map;
 	
 	OrthographicCamera camera;
 	

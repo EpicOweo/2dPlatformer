@@ -1,11 +1,11 @@
 package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.math.Vector2;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 
 public class Enemy extends Entity {
 
-	public Enemy(float x, float y, int width, int height, JsonMap map, boolean affectedByGravity) {
+	public Enemy(float x, float y, int width, int height, PNGMap map, boolean affectedByGravity) {
 		super(x, y, width, height, map, affectedByGravity);
 		this.movementSpeed = 300;
 		this.maxVelocity = new Vector2(500, 500);

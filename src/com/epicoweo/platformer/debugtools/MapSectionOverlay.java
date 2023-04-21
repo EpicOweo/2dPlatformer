@@ -6,16 +6,16 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 
 public class MapSectionOverlay extends Overlay {
 
 	private ShapeRenderer renderer = new ShapeRenderer();
 	
 	float delta;
-	JsonMap map;
+	PNGMap map;
 	
-	public MapSectionOverlay(float delta, JsonMap map) {
+	public MapSectionOverlay(float delta, PNGMap map) {
 		this.delta = delta;
 		this.map = map;
 	}

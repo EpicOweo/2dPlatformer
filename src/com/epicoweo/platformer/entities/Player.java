@@ -2,21 +2,22 @@ package com.epicoweo.platformer.entities;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
-import com.badlogic.gdx.Input.Keys;
-import com.badlogic.gdx.graphics.Pixmap;
-import com.badlogic.gdx.graphics.Pixmap.Format;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.TimeUtils;
+import com.epicoweo.platformer.abilities.Ability;
+import com.epicoweo.platformer.abilities.DashAbility;
+import com.epicoweo.platformer.abilities.MechaSuit;
+import com.epicoweo.platformer.controller.UniversalInput;
 import com.epicoweo.platformer.etc.Refs;
-import com.epicoweo.platformer.items.weapons.Pistol;
+import com.epicoweo.platformer.items.weapons.EmptyWeapon;
 import com.epicoweo.platformer.items.weapons.Weapon;
-import com.epicoweo.platformer.maps.JsonMap;
+import com.epicoweo.platformer.maps.PNGMap;
 import com.epicoweo.platformer.screens.GameScreen;
 
 public class Player extends Entity {
@@ -28,7 +29,7 @@ public class Player extends Entity {
 	int aerialXAcceleration = 250;
 	boolean jumped = false;
 	boolean dashed = false;
-	public Weapon weapon;
+	public Weapon weapon = null;
 	long lastDash = 0;
 	boolean dashing = false;
 	int framesOnWall = 0; //number of frames the player has been on the wall
@@ -36,6 +37,8 @@ public class Player extends Entity {
 	public TextureRegion invertedTexture;
 	String direction = "left";
 	public long lastOnSpeedBoost = 0;
+	
+	public boolean inMechaSuit = false;
 	
 	public int currentO2 = 10;
 	public int o2LostPerSecond = 0; // don't lose o2 for now
@@ -57,31 +60,48 @@ public class Player extends Entity {
 	public static Animation<TextureRegion> runningAnimation;
 	public static Animation<TextureRegion> standingAnimation;
 	
-	public Player(float x, float y, int width, int height, JsonMap map) {
+	public static Animation<TextureRegion> mechaStanding;
+	public static Animation<TextureRegion> mechaRunning; 
+	
+	public Array<Ability> abilities = new Array<Ability>();
+	
+	public Player(float x, float y, int width, int height, PNGMap map) {
 		super(x, y, width, height, map, true);
 		this.movementSpeed = 200;
 		this.maxVelocity = new Vector2(150, 200);
 		this.sectIn = new Rectangle();
-		equipWeapon(new Pistol(this));
+		equipWeapon(new EmptyWeapon(this));
 		spriteSheet = new Texture("./assets/textures/player/player.png");
 		spriteRegions = new TextureRegion(spriteSheet).split(16, 16);
+		
 		createTexture();
+		
+		abilities.add(new DashAbility(), new MechaSuit());
 	}
 	
-	void setupAnimations() {
+	public void setupAnimations() {
 		int left = 0;
 		if(direction.equals("left"))
 			left = 1;
 		
 		int lastFrame = 0; // index of last frame of the spritesheet that was used
 		
-		TextureRegion standing = spriteRegions[0 + left][0];
+		TextureRegion standing = spriteRegions[0 + left][0]; //left-facing sprites are row 1, right is 0
+		if(inverted == -1) {
+			standing = spriteRegions[2+left][0];
+		}
 		texture = standing;
 		lastFrame++;
 		
 		TextureRegion[] running = new TextureRegion[4];
-		for(int i = 0; i < 4; i++) { // get the running animation from the sprite sheet
-			running[i] = spriteRegions[0 + left][i+lastFrame];
+		if(inverted == 1) {
+			for(int i = 0; i < 4; i++) { // get the running animation from the sprite sheet
+				running[i] = spriteRegions[0 + left][i+lastFrame];
+			}
+		} else {
+			for(int i = 0; i < 4; i++) { // get the running animation from the sprite sheet
+				running[i] = spriteRegions[2 + left][i+lastFrame];
+			}
 		}
 		lastFrame += 4;
 		
@@ -91,28 +111,18 @@ public class Player extends Entity {
 		runningAnimation = new Animation<TextureRegion>(0.15f, running);
 		runningAnimation.setPlayMode(PlayMode.LOOP);
 		
+		mechaStanding = new Animation<TextureRegion>(0.15f, new TextureRegion(new Texture("./assets/textures/player/mechasuit.png")));
+		standingAnimation.setPlayMode(PlayMode.NORMAL);
+		mechaRunning = new Animation<TextureRegion>(0.15f, new TextureRegion(new Texture("./assets/textures/player/mechasuit.png")));
+		standingAnimation.setPlayMode(PlayMode.NORMAL);
+		
+		
+		
 		setCurrentAnimation();
 	}
 	
 	void createTexture() {
 		setupAnimations();
-		Pixmap pixmap16 = new Pixmap(16, 16, Format.Alpha);
-		
-		final int width = pixmap16.getWidth();
-		final int height = pixmap16.getHeight();
-		
-		Pixmap invertedPixmap = new Pixmap(width, height, pixmap16.getFormat());
-		
-		for (int x = 0; x < width; x++) {
-	        for (int y = 0; y < height; y++) {
-	            invertedPixmap.drawPixel(x, y, pixmap16.getPixel(x, height - y - 1));
-	        }
-	    }
-		
-		invertedTexture = new TextureRegion(new Texture(invertedPixmap));
-		
-		pixmap16.dispose();
-		invertedPixmap.dispose();
 	}
 	
 	@Override
@@ -125,6 +135,7 @@ public class Player extends Entity {
 		if(dead) {
 			spawn();
 		}
+		
 		if(jumped && inverted*velocity.y > 0) {
 			grounded = false;
 		}
@@ -138,7 +149,7 @@ public class Player extends Entity {
 		}
 		
 		if(Math.abs(velocity.x) < 10f) {
-			if(!(Gdx.input.isKeyPressed(Keys.A)) && !(Gdx.input.isKeyPressed(Keys.D))) {
+			if(!(UniversalInput.left) && !(UniversalInput.right)) {
 				velocity.x = 0;
 			}
 		}
@@ -148,16 +159,16 @@ public class Player extends Entity {
 			grounded = false;
 		}
 		if(!grounded && affectedByGravity) {
-			if(onWall && inverted*velocity.y < 0) {
+			if(onWall && inverted*velocity.y < 0 && !onEdgeOfMap()) {
 				acceleration.y = 0;
 				if(inverted == 1) {
-					if(Gdx.input.isKeyPressed(Keys.S)) {
+					if(UniversalInput.down) {
 						velocity.y = -125;
 					} else {
 						velocity.y = -50;
 					}
 				} else {
-					if(Gdx.input.isKeyPressed(Keys.W)) {
+					if(UniversalInput.up) {
 						velocity.y = 125;
 					} else {
 						velocity.y = 50;
@@ -175,11 +186,10 @@ public class Player extends Entity {
 			this.maxVelocity = new Vector2(150, 200);
 		}
 		
+		weapon.update();
 		checkDash();
-		
 		checkWallFrames();
 		processInput();
-		
 		setCurrentAnimation();
 		
 		if(TimeUtils.millis() - lastSecond >= 1000) {
@@ -199,13 +209,18 @@ public class Player extends Entity {
 		move(delta);
 		accelerate(delta);
 		
+		Array<Rectangle> sectsIn = new Array<Rectangle>();
 		for(Rectangle sect : map.mapSections) {
 			//System.out.println(sect);
 			if(this.rect.overlaps(sect)) {
-				lastSectIn = sectIn;
-				this.sectIn = sect;
+				sectsIn.add(sect);
 			}
 		}
+		if(sectsIn.size >= 1) {
+			lastSectIn = sectIn;
+			this.sectIn = sectsIn.get(0);
+		}
+		
 		
 		for(Hitbox h : this.hitboxes) {
 			h.updateHitbox(delta);
@@ -218,17 +233,32 @@ public class Player extends Entity {
 		
 		
 	}
-	
+
 	public void updateWithFlyMode(float delta) {
 		
 		if(Math.abs(velocity.x) < 10f) {
-			if(!(Gdx.input.isKeyPressed(Keys.A)) && !(Gdx.input.isKeyPressed(Keys.D))) {
+			if(!(UniversalInput.left) && !(UniversalInput.right)) {
 				velocity.x = 0;
 			}
 		}
 		
 		processInputFlyMode();
 		move(delta);
+	}
+	
+	public boolean onEdgeOfMap() {
+		try {
+			//if any of these throw IOOBException, then the player
+			//is on the edge of the map
+			map.mapTiles.get(Math.round(rect.y/16f)).get(Math.round((rect.x / 16)-1)); //get left
+			map.mapTiles.get(Math.round(rect.y/16f)).get(Math.round((rect.x / 16)+1)); //get right
+			map.mapTiles.get(Math.round((rect.y/16f)+1)).get(Math.round((rect.x / 16))); //get top
+			map.mapTiles.get(Math.round((rect.y/16f)-1)).get(Math.round((rect.x / 16))); //get bottom
+			
+			return false;
+		} catch(IndexOutOfBoundsException e) {
+			return true;
+		}
 	}
 	
 	public void checkWallFrames() {
@@ -258,7 +288,7 @@ public class Player extends Entity {
 		this.dead = true;
 	}
 	
-	protected void spawn() {
+	public void spawn() {
 		GameScreen.createPlayer(map.playerSpawn.x, map.playerSpawn.y, (int)rect.width, (int)rect.height, map);
 	}
 	
@@ -274,7 +304,7 @@ public class Player extends Entity {
 			dashing = false;
 		}
 		
-		if((TimeUtils.nanoTime() - lastDash > 100000000) || !Gdx.input.isKeyPressed(Keys.SPACE)) {
+		if((TimeUtils.nanoTime() - lastDash > 100000000) || !UniversalInput.jump()) {
 			affectedByGravity = true;
 		}
 	}
@@ -290,6 +320,7 @@ public class Player extends Entity {
 	}
 	
 	public void wallJump() {
+		if(onEdgeOfMap()) return;
 		onWall = false;
 		velocity.y += inverted*jumpVelocity;
 		if(lastSideCollided == 0) { //if going left, jump right
@@ -316,13 +347,13 @@ public class Player extends Entity {
 			toggleFlyMode();
 			return;
 		}
-		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
+		if (UniversalInput.left) {
 			velocity.x = -1 * movementSpeed;
 			if(direction == "right") {
 				direction = "left";
 				createTexture();
 			}
-		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
+		} else if (UniversalInput.right) {
 			velocity.x = 1 * movementSpeed;
 			if(direction == "left") {
 				direction = "right";
@@ -333,9 +364,9 @@ public class Player extends Entity {
 			velocity.x = 0;
 		}
 		
-		if (Gdx.input.isKeyPressed(Input.Keys.W)) {
+		if (UniversalInput.up) {
 			velocity.y = 1 * movementSpeed;
-		} else if(Gdx.input.isKeyPressed(Keys.S)) {
+		} else if(UniversalInput.down) {
 			velocity.y = -1 * movementSpeed;
 		} else {
 			velocity.y = 0;
@@ -353,7 +384,7 @@ public class Player extends Entity {
 			processInputFlyMode();
 		}
 		
-		if(velocity.x < 0) {
+		if(velocity.x < 0) { // set animation direction
 			if(direction == "right") {
 				direction = "left";
 				createTexture();
@@ -366,13 +397,13 @@ public class Player extends Entity {
 		}
 		
 		//movement
-		if (Gdx.input.isKeyPressed(Input.Keys.A)) {
+		if (UniversalInput.left) {
 			acceleration.x = -1 * movementSpeed;
 			if(!grounded && velocity.x > 0){ // to allow better aerial control
 				acceleration.x = (100 * -Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
 			}
 			
-		} else if (Gdx.input.isKeyPressed(Input.Keys.D)) {
+		} else if (UniversalInput.right) {
 			acceleration.x = 1 * movementSpeed;
 			if(!grounded && velocity.x < 0){
 				acceleration.x = (100 * -Math.signum(velocity.x)) - velocity.x * aerialXAcceleration / 100;
@@ -380,7 +411,7 @@ public class Player extends Entity {
 		} else {
 			acceleration.x = 0;
 		}
-		if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+		if (UniversalInput.justJumped()) {
 			if(grounded && !jumped) {
 				jump();
 				jumped = true;
@@ -392,17 +423,23 @@ public class Player extends Entity {
 				jump();
 				wallJumped = false;
 				jumped = true;
-			} else if(!dashed) { // allow a dash
-				dash();
-				dashed = true;
 			}
 			
 			if(collidedAnyBlackHole) {
 				cancelCollideBlackHole = true;
 			}
 		}
-		if(!Gdx.input.isKeyPressed(Keys.SPACE)) {
-			if(jumped && velocity.y > 0f && !dashed && !wallJumped) { //stopped jumping
+		
+		if(UniversalInput.dash()) {
+			if(!dashed) { // allow a dash
+				dash();
+				dashed = true;
+			}
+		}
+		
+		if(!UniversalInput.jump) {
+			if(jumped && ((velocity.y > 0f && inverted == 1) || (velocity.y < 0f && inverted == 0))
+					&& !dashed && !wallJumped) { //stopped jumping
 				acceleration.y -= 500;
 			}
 		}
@@ -411,7 +448,11 @@ public class Player extends Entity {
 			respawn();
 		}
 		
-		if(Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+		if(Gdx.input.isKeyJustPressed(Input.Keys.F3)) {
+			GameScreen.debugMode = !GameScreen.debugMode;
+		}
+		
+		if(UniversalInput.shoot()) {
 			weapon.use();
 		}
 	}
@@ -423,8 +464,8 @@ public class Player extends Entity {
 	private void dash() {
 		double dashAngle = 0; // degrees
 		int totalKeysPressed = 0;
-		boolean[] keys = {Gdx.input.isKeyPressed(Input.Keys.W), Gdx.input.isKeyPressed(Input.Keys.A),
-				Gdx.input.isKeyPressed(Input.Keys.S), Gdx.input.isKeyPressed(Input.Keys.D)};
+		boolean[] keys = {UniversalInput.up, UniversalInput.left,
+				UniversalInput.down, UniversalInput.right};
 		
 		if((keys[0] && keys[2]) || keys[1] && keys[3]) { //W,S or A, D
 			return;
@@ -474,11 +515,14 @@ public class Player extends Entity {
 		if(Math.abs(velocity.x) > 0)  {
 			if(grounded) {
 				currentAnimation = runningAnimation;
+				if(inMechaSuit) currentAnimation = mechaRunning;
 			} else {
 				currentAnimation = runningAnimation;
+				if(inMechaSuit) currentAnimation = mechaRunning;
 			}
 		} else {
 			currentAnimation = standingAnimation;
+			if(inMechaSuit) currentAnimation = mechaStanding;
 		}
 	}
 	
